@@ -18,6 +18,8 @@ from peripheralhub.basilisk.device import Basilisk  # noqa: E402
 from peripheralhub.core.registry import DeviceStatus, Registry  # noqa: E402
 from peripheralhub.core.settings import Settings  # noqa: E402
 from peripheralhub.ui.battery import BatteryWidget  # noqa: E402
+from peripheralhub.ui.pages import kb_lighting  # noqa: E402,F401  (registers the Lighting tab)
+from peripheralhub.ui.pages.kb_common import keyboard_page  # noqa: E402
 from peripheralhub.wd75.device import Wd75  # noqa: E402
 
 
@@ -95,6 +97,7 @@ def _stub_factory(device_id: str, title: str) -> Callable[[AppContext], DevicePa
 PAGES: dict[str, Callable[[AppContext], DevicePage]] = {
     row[0]: _stub_factory(row[0], row[1]) for row in [*SIDEBAR, SETTINGS_ROW]
 }
+PAGES["wd75"] = keyboard_page
 
 
 def safe(fn: Callable[[], object], what: str) -> bool:
