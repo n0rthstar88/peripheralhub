@@ -83,7 +83,7 @@ def read_upower_keyboard(bus: UPowerBus | None = None, now: float | None = None)
             props = bus.get_properties(path)
             if not _is_keyboard(path, props):
                 continue
-            if props.get("IsPresent") is not True:
+            if not bool(props.get("IsPresent", False)):
                 return None
             if "Percentage" not in props:
                 return None

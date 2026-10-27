@@ -79,3 +79,20 @@ def test_upower_no_device_or_bus_error():
 def test_upower_missing_is_present_fails_closed():
     bus = FakeBus({KBD: {"Model": "Womier WD75 BT1", "Percentage": 94.0}})
     assert read_upower_keyboard(bus) is None
+
+
+def test_upower_real_dbus_types():
+    import dbus
+
+    bus = FakeBus({dbus.ObjectPath(KBD): dbus.Dictionary({
+        dbus.String("Model"): dbus.String("Womier WD75 BT1"),
+        dbus.String("Percentage"): dbus.Double(93.6),
+        dbus.String("IsPresent"): dbus.Boolean(True),
+        dbus.String("State"): dbus.UInt32(1),
+    }, signature="sv")})
+    r = read_upower_keyboard(bus, now=1.0)
+    assert (r.level, r.charging, r.live) == (94, None, True)
+    assert isinstance(r.level, int) and type(r.level) is int
+    bus = FakeBus({KBD: {"Model": dbus.String("Womier WD75 BT1"),
+                         "Percentage": dbus.Double(50.0), "IsPresent": dbus.Boolean(False)}})
+    assert read_upower_keyboard(bus) is None
