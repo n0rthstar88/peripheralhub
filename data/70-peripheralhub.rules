@@ -1,0 +1,3 @@
+# PeripheralHub: let the logged-in user talk to these devices without root
+KERNEL=="hidraw*", ATTRS{idVendor}=="8888", ATTRS{idProduct}=="2222", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="1532", ATTRS{idProduct}=="0099", TAG+="uaccess"
