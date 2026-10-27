@@ -27,3 +27,8 @@ def test_hs_conversion_roundtrip():
 ])
 def test_banner_texts(state, conn, expected):
     assert status_banner(state, conn) == expected
+
+
+def test_install_script_is_in_repo_root():
+    from peripheralhub.ui.pages.kb_common import install_script
+    assert (install_script().parent / "pyproject.toml").exists()

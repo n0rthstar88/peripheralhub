@@ -31,7 +31,7 @@ def status_banner(state: Wd75State, connection: Connection) -> tuple[str, str] |
 
 
 def install_script() -> Path:
-    return Path(__file__).resolve().parents[3] / "install.sh"
+    return Path(__file__).resolve().parents[4] / "install.sh"
 
 
 def to_state(s: DeviceStatus) -> Wd75State:

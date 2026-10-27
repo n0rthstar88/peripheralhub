@@ -58,15 +58,12 @@ class LightingPage:
         self._timer = 0
         self._ids = sorted(EFFECTS)
         self._hue, self._sat = 0, 255
-        self._note: Adw.PreferencesGroup | None = None
 
         self._battery = BatteryWidget()
         self._battery.set_halign(Gtk.Align.START)
+        for m in ('margin_top', 'margin_start'):
+            setattr(self._battery, m, 12)
         page = Adw.PreferencesPage()
-
-        top = Adw.PreferencesGroup(title="Battery")
-        top.add(self._battery)
-        page.add(top)
 
         grp = Adw.PreferencesGroup(title="Lighting")
         self._effect = Adw.ComboRow(title="Effect")
@@ -104,12 +101,11 @@ class LightingPage:
         colour.add(row)
         page.add(colour)
 
-        self._note = Adw.PreferencesGroup()
+        note = Adw.PreferencesGroup()
         note_row = Adw.ActionRow(title=HEART_NOTE, icon_name="dialog-information-symbolic")
         note_row.set_title_lines(0)
-        self._note.add(note_row)
-        self._note.set_visible(False)
-        page.add(self._note)
+        note.add(note_row)
+        page.add(note)
 
         save = Adw.PreferencesGroup()
         srow = Adw.ActionRow(title="Save to keyboard", subtitle="Changes preview live and are lost on power-off until saved.")
@@ -127,7 +123,10 @@ class LightingPage:
         page.add(save)
 
         self._gate = GatedView(ctx, page, self._resync)
-        self._root = self._gate
+        self._root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self._root.append(self._battery)
+        self._root.append(self._gate)
+        self._root.connect("unrealize", lambda _w: self._cancel_pending())
 
     # -- construction helpers
     def _scale_row(self, grp: Adw.PreferencesGroup, title: str, key: str) -> Gtk.Scale:
@@ -152,16 +151,10 @@ class LightingPage:
         if keep is not None and keep in self._ids:
             self._effect.set_selected(self._ids.index(keep))
         self._loading = False
-        self._update_note()
 
     def _current_effect(self) -> int | None:
         sel = self._effect.get_selected()
         return self._ids[sel] if sel < len(self._ids) else None
-
-    def _update_note(self) -> None:
-        eid = self._current_effect()
-        if self._note is not None:
-            self._note.set_visible(eid is not None and "heart" in effect_name(eid, self._names()).lower())
 
     # -- DevicePage-like interface
     def widget(self) -> Gtk.Widget:
@@ -171,6 +164,9 @@ class LightingPage:
         self._battery.set_reading(s.battery, time.time())
         state = to_state(s)
         self._gate.set_state(state, self._ctx.wd75.connection)
+        if state is not Wd75State.READY:
+            self._cancel_pending()
+        self._sync_save()
         if state is Wd75State.READY:
             if not self._loaded:
                 self._load()
@@ -184,7 +180,17 @@ class LightingPage:
             if s.id == "wd75":
                 self.on_status(s)
 
+    def _cancel_pending(self) -> None:
+        if self._timer:
+            GLib.source_remove(self._timer)
+            self._timer = 0
+        self._pending = {}
+
+    def _sync_save(self) -> None:
+        self._save.set_sensitive(self._dirty and self._gate.state is Wd75State.READY)
+
     def _asleep(self) -> None:
+        self._cancel_pending()
         self._loaded = False
         self._gate.set_state(Wd75State.ASLEEP, self._ctx.wd75.connection)
 
@@ -204,12 +210,12 @@ class LightingPage:
         self._hue, self._sat = rgb.hue, rgb.saturation
         self._picker.set_rgba(_rgba(self._hue, self._sat))
         self._loading = False
-        self._set_dirty(False)
-        self._update_note()
+        self._set_dirty(self._dirty)  # unsaved previews stay unsaved across a reload
 
     def _set_dirty(self, v: bool) -> None:
         self._dirty = v
         self._unsaved.set_visible(v)
+        self._sync_save()
 
     def _change(self, key: str, value: int) -> None:
         if self._loading:
@@ -221,7 +227,6 @@ class LightingPage:
 
     def _on_effect(self, *_a) -> None:
         eid = self._current_effect()
-        self._update_note()
         if eid is not None:
             self._change("effect", eid)
 
@@ -248,7 +253,7 @@ class LightingPage:
     def _flush(self) -> bool:
         self._timer = 0
         changes, self._pending = self._pending, {}
-        if not changes:
+        if not changes or self._gate.state is not Wd75State.READY:
             return GLib.SOURCE_REMOVE
         try:
             self._ctx.wd75.apply_rgb(**changes)
@@ -266,6 +271,8 @@ class LightingPage:
         return GLib.SOURCE_REMOVE
 
     def _on_save(self, _b) -> None:
+        if not self._dirty or self._gate.state is not Wd75State.READY:
+            return
         if self._timer:
             GLib.source_remove(self._timer)
             self._timer = 0
