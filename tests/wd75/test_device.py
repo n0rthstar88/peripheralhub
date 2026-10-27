@@ -150,3 +150,23 @@ def test_effect_name_fallback_and_override():
 
 def test_effects_table_matches_probed_ids():
     assert set(EFFECTS) == set(range(1, 18))
+
+
+def test_probe_backs_up_first_previews_only_and_restores(tmp_path):
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "probe", Path(__file__).parent.parent.parent / "tools" / "wd75_probe_effects.py")
+    probe_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(probe_mod)
+
+    kb, wd = make(tmp_path)
+    wd.refresh()
+    orig, valid, ok, err = probe_mod.probe(wd, delay=0)
+    assert err is None and ok and orig == 4
+    assert len(list((tmp_path / "backups").iterdir())) == 1
+    assert not any(p[0] == 0x09 for p in kb.sent)
+    assert kb.rgb[2][0] == 4
+    first_write = next(i for i, p in enumerate(kb.sent) if p[0] == 0x07)
+    assert any(p[0] == 0x12 for p in kb.sent[:first_write])  # backup read precedes writes
