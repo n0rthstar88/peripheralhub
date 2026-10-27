@@ -22,6 +22,7 @@ from peripheralhub.ui.pages import kb_lighting  # noqa: E402,F401  (registers th
 from peripheralhub.ui.pages import kb_keymap  # noqa: E402,F401  (registers the Keymap tab)
 from peripheralhub.ui.pages import kb_macros  # noqa: E402,F401  (registers the Macros tab)
 from peripheralhub.ui.pages.kb_common import keyboard_page  # noqa: E402
+from peripheralhub.ui.pages.mouse_dpi import mouse_page  # noqa: E402
 from peripheralhub.wd75.device import Wd75  # noqa: E402
 
 
@@ -100,6 +101,7 @@ PAGES: dict[str, Callable[[AppContext], DevicePage]] = {
     row[0]: _stub_factory(row[0], row[1]) for row in [*SIDEBAR, SETTINGS_ROW]
 }
 PAGES["wd75"] = keyboard_page
+PAGES["basilisk"] = mouse_page
 
 
 def safe(fn: Callable[[], object], what: str) -> bool:
