@@ -21,9 +21,14 @@ def _field(body: str, key: str) -> str | None:
     return None if m is None else (m.group(1) if m.group(1) is not None else m.group(2))
 
 
+def _split_lines(text: str) -> list[str]:
+    """Split on \\n only (keeping endings), so CRLF and odd separators survive."""
+    return re.findall(r"[^\n]*\n|[^\n]+", text)
+
+
 def _single_line_calls(text: str):
     """Yield (line_index, match, output) for single-line hl.monitor calls."""
-    for i, line in enumerate(text.splitlines(keepends=True)):
+    for i, line in enumerate(_split_lines(text)):
         if not _START.match(line):
             continue
         m = _CALL.search(line)
@@ -34,7 +39,7 @@ def _single_line_calls(text: str):
 
 def _multiline_outputs(text: str) -> set[str]:
     single = {i for i, _, _ in _single_line_calls(text)}
-    lines = text.splitlines()
+    lines = [l.rstrip("\r\n") for l in _split_lines(text)]
     found: set[str] = set()
     for i, line in enumerate(lines):
         if _START.match(line) and i not in single:
@@ -66,6 +71,28 @@ def render_monitor(m: Monitor) -> str:
     )
 
 
+def _set_key(body: str, key: str, value: str) -> str:
+    """Replace `key = <value>` in place, or append it; other keys are untouched."""
+    pat = re.compile(rf'(?<![\w])({key}\s*=\s*)(?:"[^"]*"|[-\w.]+)')
+    if pat.search(body):
+        return pat.sub(lambda m: m.group(1) + value, body, count=1)
+    core = body.rstrip()
+    tail = body[len(core):]
+    sep = " " if core.endswith(",") else ", "
+    return f"{core}{sep}{key} = {value}{tail}"
+
+
+def _edit_body(body: str, m: Monitor) -> str:
+    if m.disabled:
+        return _set_key(body, "disabled", "true")
+    if re.search(r"(?<![\w])disabled\s*=", body):
+        body = _set_key(body, "disabled", "false")
+    body = _set_key(body, "mode", f'"{mode_string(m)}"')
+    body = _set_key(body, "position", f'"{m.x}x{m.y}"')
+    body = _set_key(body, "scale", f"{m.scale:g}")
+    return _set_key(body, "transform", str(m.transform))
+
+
 def update_monitors(text: str, monitors: list[Monitor]) -> str:
     by_name = {m.name: m for m in monitors}
     clash = _multiline_outputs(text) & by_name.keys()
@@ -73,30 +100,36 @@ def update_monitors(text: str, monitors: list[Monitor]) -> str:
         raise UnsupportedConfig(
             f"multi-line hl.monitor for {', '.join(sorted(clash))}: edit monitors.lua manually"
         )
-    lines = text.splitlines(keepends=True)
+    lines = _split_lines(text)
     seen: set[str] = set()
     for i, match, name in _single_line_calls(text):
         if name in by_name:
             line = lines[i]
-            lines[i] = line[:match.start()] + render_monitor(by_name[name]) + line[match.end():]
+            s, e = match.span("body")
+            lines[i] = line[:s] + _edit_body(match.group("body"), by_name[name]) + line[e:]
             seen.add(name)
     out = "".join(lines)
     missing = [m for m in monitors if m.name not in seen]
     if missing:
+        nl = "\r\n" if "\r\n" in text else "\n"
         if out and not out.endswith("\n"):
-            out += "\n"
-        out += "".join(render_monitor(m) + "\n" for m in missing)
+            out += nl
+        out += "".join(render_monitor(m) + nl for m in missing)
     return out
 
 
 def write_monitors(path: str, monitors: list[Monitor], now: float) -> str:
-    with open(path, encoding="utf-8") as f:
+    with open(path, encoding="utf-8", newline="") as f:
         old = f.read()
     new = update_monitors(old, monitors)
     backup = path + f".bak.{int(now)}"
+    n = 0
+    while os.path.exists(backup):
+        n += 1
+        backup = path + f".bak.{int(now)}.{n}"
     shutil.copy2(path, backup)
     tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
+    with open(tmp, "w", encoding="utf-8", newline="") as f:
         f.write(new)
     os.replace(tmp, path)
     return backup

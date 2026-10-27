@@ -45,3 +45,11 @@ def test_validate_corner_only_is_not_touching_and_all_disabled():
 def test_normalize_shifts_to_origin():
     out = normalize([mon(x=100, y=50), mon("H", x=2660, y=50)])
     assert [(m.x, m.y) for m in out] == [(0, 0), (2560, 0)]
+
+
+def test_fractional_scale_snapped_neighbour_is_valid():
+    a = mon(w=1920, h=1080, scale=1.75)  # logical 1097.14 wide
+    b = mon("B", w=1920, h=1080, scale=1.75)
+    x, y = snap_position(b, [a], 1090, 5)
+    b.x, b.y = x, y
+    assert validate_layout([a, b]) == []

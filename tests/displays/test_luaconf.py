@@ -66,3 +66,53 @@ def test_write_creates_backup(tmp_path):
     assert backup == str(f) + ".bak.1234"
     assert Path(backup).read_text() == FIXTURE
     assert "transform = 1" in f.read_text()
+
+
+def test_unknown_keys_and_spacing_preserved():
+    text = 'hl.monitor({output="DP-1",  mode = "1x1@1",vrr = 1 , position="9x9", scale=2}) -- keep\n'
+    out = update_monitors(text, [replace(DP1, transform=3)])
+    assert out == (
+        'hl.monitor({output="DP-1",  mode = "2560x1080@75",vrr = 1 , position="0x0", scale=1, transform = 3}) -- keep\n'
+    )
+
+
+def test_existing_transform_replaced_in_place():
+    text = 'hl.monitor({ output = "DP-1", transform = 1, bitdepth = 10 })\n'
+    assert update_monitors(text, [replace(DP1, transform=2)]) == (
+        'hl.monitor({ output = "DP-1", transform = 2, bitdepth = 10, mode = "2560x1080@75", '
+        'position = "0x0", scale = 1 })\n'
+    )
+
+
+def test_crlf_preserved(tmp_path):
+    text = "-- c\r\n" + 'hl.monitor({ output = "DP-1", mode = "a", position = "0x0", scale = 1, transform = 0 })\r\n'
+    out = update_monitors(text, [replace(DP1, transform=1), HDMI])
+    assert out.startswith("-- c\r\n") and "\n" not in out.replace("\r\n", "")
+    assert out.endswith('transform = 0 })\r\n')
+    f = tmp_path / "m.lua"
+    f.write_bytes(text.encode())
+    write_monitors(str(f), [DP1], 5)
+    assert b"\r\n" in f.read_bytes() and b"\n" not in f.read_bytes().replace(b"\r\n", b"")
+
+
+def test_same_second_backup_not_overwritten(tmp_path):
+    f = tmp_path / "monitors.lua"
+    f.write_text(FIXTURE)
+    b1 = write_monitors(str(f), [replace(DP1, transform=1)], 100)
+    b2 = write_monitors(str(f), [replace(DP1, transform=2)], 100)
+    assert b1 != b2
+    assert Path(b1).read_text() == FIXTURE
+    assert "transform = 1" in Path(b2).read_text()
+
+
+def test_prefix_output_not_confused():
+    text = 'hl.monitor({ output = "DP-10", mode = "a", position = "0x0", scale = 1 })\n'
+    assert update_monitors(text, [DP1]).startswith(text)
+
+
+def test_no_trailing_newline_and_unchanged_roundtrip():
+    text = 'hl.monitor({ output = "DP-1", mode = "2560x1080@75", position = "0x0", scale = 1, transform = 0 })'
+    assert update_monitors(text, [DP1]) == text
+    assert update_monitors(text, [DP1, HDMI]).startswith(text + "\n")
+    full = FIXTURE.replace(", scale = 1 })", ", scale = 1, transform = 0 })")
+    assert update_monitors(full, [DP1, HDMI]) == full

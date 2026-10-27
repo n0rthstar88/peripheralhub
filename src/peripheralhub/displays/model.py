@@ -6,6 +6,7 @@ TRANSFORMS: dict[int, str] = {
     0: "Normal", 1: "90°", 2: "180°", 3: "270°",
     4: "Flipped", 5: "Flipped 90°", 6: "Flipped 180°", 7: "Flipped 270°",
 }
+_TOL = 1.0  # px; fractional scales give non-integer logical sizes
 SCALES = (1.0, 1.25, 1.5, 1.6, 1.75, 2.0)
 
 
@@ -73,9 +74,9 @@ def validate_layout(ms: list[Monitor]) -> list[str]:
             bx0, by0, bx1, by1 = _rect(b)
             ox = min(ax1, bx1) - max(ax0, bx0)
             oy = min(ay1, by1) - max(ay0, by0)
-            if ox > 0 and oy > 0:
+            if ox > _TOL and oy > _TOL:
                 errors.append(f"{a.name} and {b.name} overlap")
-            elif (ox == 0 and oy > 0) or (oy == 0 and ox > 0):
+            elif (abs(ox) <= _TOL and oy > _TOL) or (abs(oy) <= _TOL and ox > _TOL):
                 touching[a.name] = touching[b.name] = True
     if len(enabled) > 1:
         errors += [f"{n} is not touching any other monitor" for n, t in touching.items() if not t]
