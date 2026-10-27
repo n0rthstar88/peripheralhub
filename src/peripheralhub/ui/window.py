@@ -15,6 +15,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, GLib, Gtk  # noqa: E402
 
 from peripheralhub.basilisk.device import Basilisk  # noqa: E402
+from peripheralhub.core.notify import AppBatteryWatch, LowBatteryNotifier  # noqa: E402
 from peripheralhub.core.registry import DeviceStatus, Registry  # noqa: E402
 from peripheralhub.core.settings import Settings  # noqa: E402
 from peripheralhub.ui.battery import BatteryWidget  # noqa: E402
@@ -22,8 +23,10 @@ from peripheralhub.ui.pages import kb_lighting  # noqa: E402,F401  (registers th
 from peripheralhub.ui.pages import kb_keymap  # noqa: E402,F401  (registers the Keymap tab)
 from peripheralhub.ui.pages import kb_macros  # noqa: E402,F401  (registers the Macros tab)
 from peripheralhub.ui.pages.displays import displays_page  # noqa: E402
+from peripheralhub.ui.pages.headset import headset_page  # noqa: E402
 from peripheralhub.ui.pages.kb_common import keyboard_page  # noqa: E402
 from peripheralhub.ui.pages.mouse_dpi import mouse_page  # noqa: E402
+from peripheralhub.ui.pages.settings import settings_page  # noqa: E402
 from peripheralhub.wd75.device import Wd75  # noqa: E402
 
 
@@ -104,6 +107,8 @@ PAGES: dict[str, Callable[[AppContext], DevicePage]] = {
 PAGES["wd75"] = keyboard_page
 PAGES["basilisk"] = mouse_page
 PAGES["displays"] = displays_page
+PAGES["headset"] = headset_page
+PAGES["settings"] = settings_page
 
 
 def safe(fn: Callable[[], object], what: str) -> bool:
@@ -159,6 +164,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._pages: dict[str, DevicePage] = {}
         self._nav: dict[str, Adw.NavigationPage] = {}
         self._rows: dict[str, _Row] = {}
+        self._battery_watch = AppBatteryWatch(LowBatteryNotifier(ctx.settings))
 
         self._split = Adw.NavigationSplitView()
         self.set_content(self._split)
@@ -244,5 +250,6 @@ class MainWindow(Adw.ApplicationWindow):
                     row.update(s)
                 if s.id in self._pages:
                     self._safe_status(self._pages[s.id], s)
+            self._battery_watch.feed(statuses)
         except Exception:
             traceback.print_exc()
