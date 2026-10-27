@@ -22,3 +22,14 @@ def test_undo_stack():
 def test_picker_names_and_dangerous_reboot():
     assert search("RGB_TOG") and search("RM_TOGG")
     assert is_dangerous(0x7C01)
+
+
+def test_failed_undo_write_keeps_entry():
+    from peripheralhub.ui.pages.kb_keymap import undo_last
+    u = UndoStack()
+    u.push(0, 1, 1, 0x04, 0x05)
+    assert not undo_last(u, lambda *a: False)
+    assert u.peek() == (0, 1, 1, 0x04)
+    seen = []
+    assert undo_last(u, lambda *a: seen.append(a) or True)
+    assert seen == [(0, 1, 1, 0x04)] and u.peek() is None

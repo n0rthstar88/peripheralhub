@@ -58,11 +58,30 @@ class UndoStack:
         layer, row, col, old, _new = self._items.pop()
         return layer, row, col, old
 
+    def peek(self) -> tuple[int, int, int, int] | None:
+        if not self._items:
+            return None
+        layer, row, col, old, _new = self._items[-1]
+        return layer, row, col, old
+
+    def drop(self) -> None:
+        if self._items:
+            self._items.pop()
+
     def clear(self) -> None:
         self._items.clear()
 
     def __bool__(self) -> bool:
         return bool(self._items)
+
+
+def undo_last(stack: UndoStack, write) -> bool:
+    """Run the newest undo write; the entry is only dropped when the write succeeded."""
+    w = stack.peek()
+    if w is None or not write(*w):
+        return False
+    stack.drop()
+    return True
 
 
 def needs_last_fn_warning(keymap, layer: int, row: int, col: int, new_code: int) -> bool:
@@ -203,6 +222,7 @@ class KeymapPage:
                 self._load()
         else:
             self._km = None
+            self._undo_btn.set_sensitive(False)
 
     def _resync(self) -> None:
         self._km = None
@@ -212,6 +232,7 @@ class KeymapPage:
 
     def _asleep(self) -> None:
         self._km = None
+        self._undo_btn.set_sensitive(False)
         self._pick_pop.popdown()
         self._gate.set_state(Wd75State.ASLEEP, self._ctx.wd75.connection)
 
@@ -245,7 +266,7 @@ class KeymapPage:
             (b.add_css_class if code == 0x0001 else b.remove_css_class)("dim")
             (b.add_css_class if self._sel == (r, c) else b.remove_css_class)("sel")
         self._update_tint()
-        self._undo_btn.set_sensitive(bool(self._undo))
+        self._undo_btn.set_sensitive(bool(self._undo) and self._km is not None)
 
     def _update_tint(self) -> None:
         tint = key_tint(self._ctx.settings.get("wd75.rgb", None))
@@ -284,14 +305,13 @@ class KeymapPage:
         return True
 
     def _on_undo(self, _b) -> None:
-        w = self._undo.undo()
-        if w is None:
+        w = self._undo.peek()
+        if w is None or self._km is None:
             return
-        if not self._write(*w, record=False):
-            return
-        self._layer = w[0]
-        self._layer_dd.set_selected(w[0])
-        self._refresh_keys()
+        if undo_last(self._undo, lambda *a: self._write(*a, record=False)):
+            self._layer = w[0]
+            self._layer_dd.set_selected(w[0])
+            self._refresh_keys()
 
     # -- events
     def _on_layer(self, *_a) -> None:
@@ -507,8 +527,7 @@ class KeymapPage:
         def go() -> None:
             wd = self._ctx.wd75
             try:
-                wd.ensure_backup()
-                wd.via.reset_keymap()
+                wd.reset_keymap()
             except (ViaError, OSError, AttributeError) as e:
                 self._fail(e)
                 return

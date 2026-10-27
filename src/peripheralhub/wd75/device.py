@@ -180,6 +180,12 @@ class Wd75:
         self._require_via().write_macro_buffer(buf)
 
     @_writing
+    def reset_keymap(self) -> None:
+        """Erase the keymap to firmware defaults (VIA 0x06). Backs up first."""
+        self.ensure_backup()
+        self._require_via().reset_keymap()
+
+    @_writing
     def restore(self, target: Snapshot, **scope) -> int:
         """Write back keys that differ from target (scope: layers=, keys=). Returns keys written."""
         self.ensure_backup()

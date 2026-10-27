@@ -170,3 +170,22 @@ def test_probe_backs_up_first_previews_only_and_restores(tmp_path):
     assert kb.rgb[2][0] == 4
     first_write = next(i for i, p in enumerate(kb.sent) if p[0] == 0x07)
     assert any(p[0] == 0x12 for p in kb.sent[:first_write])  # backup read precedes writes
+
+
+def test_reset_keymap_backs_up_first_is_busy_and_sends_once(tmp_path):
+    kb, wd = make(tmp_path)
+    wd.refresh()
+    seen = {}
+    orig = kb.exchange
+
+    def spy(packet):
+        if packet[0] == 0x06:
+            seen["busy"] = wd.busy
+            seen["backups"] = len(list((tmp_path / "backups").glob("wd75-*.json")))
+        return orig(packet)
+
+    kb.exchange = spy
+    wd.reset_keymap()
+    assert seen == {"busy": True, "backups": 1}
+    assert [p for p in kb.sent if p[0] == 0x06] == [b"\x06" + bytes(31)]
+    assert not wd.busy
