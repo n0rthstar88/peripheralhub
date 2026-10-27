@@ -26,13 +26,18 @@ _TO, _MO, _DF, _TG, _OSL, _OSM, _TT = 0x5200, 0x5220, 0x5240, 0x5260, 0x5280, 0x
 _MACRO = 0x7700
 _WOMIER = 0x7E00
 _LAYER_KINDS = {_TO: "TO", _MO: "MO", _DF: "DF", _TG: "TG", _OSL: "OSL", _TT: "TT"}
-_DANGEROUS = frozenset({0x7C00, 0x7C03})
+_DANGEROUS = frozenset({0x7C00, 0x7C01, 0x7C03})
 
 _WOMIER_NAMES = (
     "Battery Query", "Bluetooth 1", "Bluetooth 2", "Bluetooth 3", "2.4GHz", "Win Lock",
     "RGB On", "RGB Off", "RGB Toggle", "RGB Mode", "RGB Hue", "RGB Brightness+",
     "RGB Brightness-", "RGB Speed+", "RGB Speed-", "Heart Toggle", "Heart Hue",
 )
+
+
+_WOMIER_IDS = ("BATT", "BT1", "BT2", "BT3", "2G4", "WINLK", "RGB_ON", "RGB_OFF", "RGB_TOG",
+               "RGB_MODE", "RGB_HUE", "RGB_VAI", "RGB_VAD", "RGB_SPI", "RGB_SPD",
+               "HEART_TOG", "HEART_HUE")
 
 
 def _build() -> list[Keycode]:
@@ -98,29 +103,34 @@ def _build() -> list[Keycode]:
     ]:
         add(code, name, lab, "Media")
     # Lighting: backlight, underglow / legacy RGB (0x7820+), RGB Matrix (0x7840+).
+    bl = ["BL_ON", "BL_OFF", "BL_TOGG", "BL_DOWN", "BL_UP", "BL_STEP", "BL_BRTG"]
+    rgb = ["RGB_TOG", "RGB_MOD", "RGB_RMOD", "RGB_HUI", "RGB_HUD", "RGB_SAI", "RGB_SAD",
+           "RGB_VAI", "RGB_VAD", "RGB_SPI", "RGB_SPD"]
+    rm = ["RM_ON", "RM_OFF", "RM_TOGG", "RM_NEXT", "RM_PREV", "RM_HUEU", "RM_HUED",
+          "RM_SATU", "RM_SATD", "RM_VALU", "RM_VALD", "RM_SPDU", "RM_SPDD"]
     for i, lab in enumerate(["Backlight On", "Backlight Off", "Backlight Toggle",
                              "Backlight Down", "Backlight Up", "Backlight Step",
                              "Backlight Breathing"]):
-        add(0x7800 + i, f"BL_{i}", lab, "Lighting")
+        add(0x7800 + i, bl[i], lab, "Lighting")
     for i, lab in enumerate(["RGB Toggle", "RGB Mode Next", "RGB Mode Prev", "RGB Hue Up",
                              "RGB Hue Down", "RGB Sat Up", "RGB Sat Down",
                              "RGB Brightness Up", "RGB Brightness Down",
                              "RGB Speed Up", "RGB Speed Down"]):
-        add(0x7820 + i, f"RGB_{i}", lab, "Lighting")
+        add(0x7820 + i, rgb[i], lab, "Lighting")
     for i, lab in enumerate(["RGB Matrix On", "RGB Matrix Off", "RGB Matrix Toggle",
                              "RGB Matrix Mode Next", "RGB Matrix Mode Prev",
                              "RGB Matrix Hue Up", "RGB Matrix Hue Down",
                              "RGB Matrix Sat Up", "RGB Matrix Sat Down",
                              "RGB Matrix Brightness Up", "RGB Matrix Brightness Down",
                              "RGB Matrix Speed Up", "RGB Matrix Speed Down"]):
-        add(0x7840 + i, f"RM_{i}", lab, "Lighting")
+        add(0x7840 + i, rm[i], lab, "Lighting")
     for n in range(8):
         for base, kind in _LAYER_KINDS.items():
             add(base | n, f"{kind}({n})", f"{kind}({n})", "Layers")
     for n in range(16):
         add(_MACRO + n, f"MACRO({n})", f"M{n}", "Macros")
     for i, lab in enumerate(_WOMIER_NAMES):
-        add(_WOMIER + i, f"WOMIER_{i}", lab, "Womier")
+        add(_WOMIER + i, f"WOMIER_{_WOMIER_IDS[i]}", lab, "Womier")
     for code, name, lab in [
         (0x7C00, "QK_BOOT", "Bootloader"), (0x7C01, "QK_REBOOT", "Reboot"),
         (0x7C02, "DB_TOGG", "Debug Toggle"), (0x7C03, "EE_CLR", "Clear EEPROM"),
