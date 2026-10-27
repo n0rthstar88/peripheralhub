@@ -12,7 +12,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from peripheralhub.basilisk.device import Basilisk  # noqa: E402
 from peripheralhub.basilisk.effects import HOST_EFFECTS  # noqa: E402
-from peripheralhub.ui.pages.mouse_dpi import DEBOUNCE_MS, DEVICE_ERRORS, MouseGate, recheck  # noqa: E402
+from peripheralhub.ui.pages.mouse_dpi import DEBOUNCE_MS, DEVICE_ERRORS, MouseGate, recheck, should_reload  # noqa: E402
 
 if TYPE_CHECKING:
     from peripheralhub.core.registry import DeviceStatus
@@ -186,20 +186,23 @@ class LightingPage:
             self._timer = 0
         self._pending = set()
 
-    def _fail(self, e: Exception) -> None:
+    def _fail(self, e: Exception, from_load: bool = False) -> None:
         self._cancel_pending()
         self._loaded = False
+        recheck(self._ctx)
+        state = self._ctx.basilisk.state
+        self._gate.set_state(state)
+        if should_reload(state, from_load):
+            self._load()  # brightness from the device, effect from settings
         self._error.set_label(f"Mouse error: {e}")
         self._error.set_visible(True)
-        recheck(self._ctx)
-        self._gate.set_state(self._ctx.basilisk.state)
 
     # -- load / write
     def _load(self) -> None:
         try:
             level = self._ctx.basilisk.brightness()
         except DEVICE_ERRORS as e:
-            self._fail(e)
+            self._fail(e, from_load=True)
             return
         self._loaded = True
         self._error.set_visible(False)

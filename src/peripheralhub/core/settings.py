@@ -5,8 +5,12 @@ Keys used by the app:
   wd75.rgb            {"hue", "sat", "brightness", "effect", "speed"}
   battery.wd75        {"level": int, "at": float}
   battery.low_threshold (default 20)
-  mouse.dpi, mouse.stages, mouse.poll, mouse.brightness
-  mouse.effect        {"kind": "firmware"|"host", "name": str, "params": dict}
+  mouse.dpi (int), mouse.poll (125|500|1000), mouse.brightness (0-255)
+  mouse.stages        {"values": [int, ...1-5], "active": int (1-based)}
+  mouse.effect        {"kind": "firmware"|"host", "name": str, "params": dict}; colours are [r, g, b] lists
+    params by effect: static {"color"}; breathing {"color", "period"}; color_cycle {"period"};
+    strip_gradient {"colors": [[r,g,b], [r,g,b]], "period"}; zones_static {"zone_colors": {"logo","wheel","strip"}};
+    match_keyboard {"hue", "sat"} (VIA units, from wd75.rgb); spectrum/wave/off {}
 """
 from __future__ import annotations
 

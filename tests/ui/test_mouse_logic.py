@@ -36,3 +36,12 @@ def test_effect_params_per_effect():
         "logo": [7, 7, 7], "wheel": [8, 8, 8], "strip": [9, 9, 9]}
     assert effect_params("match_keyboard", v, {"hue": 85, "sat": 200}) == {"hue": 85, "sat": 200}
     assert effect_params("match_keyboard", v, None) == {"hue": 0, "sat": 255}
+
+
+def test_should_reload_only_when_still_ready_and_not_loading():
+    from peripheralhub.ui.pages.mouse_dpi import should_reload
+
+    assert should_reload("ready", False)
+    assert not should_reload("ready", True)
+    assert not should_reload("disconnected", False)
+    assert not should_reload("no_permission", False)

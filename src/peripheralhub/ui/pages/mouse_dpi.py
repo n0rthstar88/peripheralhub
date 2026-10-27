@@ -35,6 +35,11 @@ def validate_stages(values: list[int]) -> list[int]:
     return [clamp_dpi(v) for v in values]
 
 
+def should_reload(state: str, from_load: bool) -> bool:
+    """After a failed write: reload the controls from the device if it is still ready (and we are not already loading)."""
+    return state == "ready" and not from_load
+
+
 class MouseGate(Gtk.Stack):
     """Shows `content` when the mouse is ready; otherwise a permission or not-connected banner."""
 
@@ -172,13 +177,16 @@ class DpiPage:
             self._timer = 0
         self._pending = set()
 
-    def _fail(self, e: Exception) -> None:
+    def _fail(self, e: Exception, from_load: bool = False) -> None:
         self._cancel_pending()
         self._loaded = False
-        self._error.set_label(f"Mouse error: {e}")
-        self._error.set_visible(True)
         recheck(self._ctx)
-        self._gate.set_state(self._ctx.basilisk.state)
+        state = self._ctx.basilisk.state
+        self._gate.set_state(state)
+        if should_reload(state, from_load):
+            self._load()  # revert the controls to what the device reports
+        self._error.set_label(f"Mouse error: {e}")  # after the reload, which clears the error
+        self._error.set_visible(True)
 
     # -- stage rows
     def _build_stage_rows(self) -> None:
@@ -216,6 +224,10 @@ class DpiPage:
         if self._loading:
             return
         self._values[i] = clamp_dpi(int(row.get_value()))
+        if row.get_value() != self._values[i]:
+            self._loading = True
+            row.set_value(self._values[i])
+            self._loading = False
         self._queue("stages")
 
     def _on_add(self, _b) -> None:
@@ -241,7 +253,7 @@ class DpiPage:
             values, active = b.stages()
             hz = b.poll()
         except DEVICE_ERRORS as e:
-            self._fail(e)
+            self._fail(e, from_load=True)
             return
         self._loaded = True
         self._error.set_visible(False)
@@ -279,6 +291,9 @@ class DpiPage:
                 st.set("mouse.dpi", x)
             if "dpi" in todo and "stages" not in todo:
                 v = clamp_dpi(int(self._dpi.get_value()))
+                self._loading = True
+                self._dpi.set_value(v)
+                self._loading = False
                 b.set_dpi(v)
                 st.set("mouse.dpi", v)
             if "poll" in todo:
