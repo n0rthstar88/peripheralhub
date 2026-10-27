@@ -1,18 +1,23 @@
 from __future__ import annotations
 
+import importlib
 import sys
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     """No args: GUI. `service`: background service. `cli ...`: command line (sees the args after `cli`)."""
-    if len(sys.argv) > 1 and sys.argv[1] in ("service", "cli"):
-        mode = sys.argv[1]
-        sys.argv = [f"phub-{mode}", *sys.argv[2:]]
-        if mode == "service":
-            from peripheralhub import service
-            return service.main() or 0
-        from peripheralhub import cli
-        return cli.main() or 0
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] in ("service", "cli"):
+        mode = argv[0]
+        sys.argv = [f"phub-{mode}", *argv[1:]]
+        try:
+            module = importlib.import_module(f"peripheralhub.{mode}")
+        except ModuleNotFoundError as e:
+            if e.name != f"peripheralhub.{mode}":
+                raise
+            print(f"{mode} is not available yet", file=sys.stderr)
+            return 2
+        return module.main() or 0
     from peripheralhub.ui.app import main as app_main
     return app_main()
 
