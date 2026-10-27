@@ -12,7 +12,6 @@ UPOWER_PATH = "/org/freedesktop/UPower"
 DEVICE_IFACE = "org.freedesktop.UPower.Device"
 MODEL_PREFIX = "Womier WD75"
 _MAC = re.compile(r"(?:[0-9A-Fa-f]{2}[:_-]){5}[0-9A-Fa-f]{2}")
-UPOWER_STATE_CHARGING = 1
 
 
 @dataclass(frozen=True)
@@ -84,13 +83,12 @@ def read_upower_keyboard(bus: UPowerBus | None = None, now: float | None = None)
             props = bus.get_properties(path)
             if not _is_keyboard(path, props):
                 continue
-            if "IsPresent" in props and not bool(props["IsPresent"]):
+            if props.get("IsPresent") is not True:
                 return None
             if "Percentage" not in props:
                 return None
-            charging = int(props.get("State", 0)) == UPOWER_STATE_CHARGING
             t = time.time() if now is None else now
-            return BatteryReading(int(round(float(props["Percentage"]))), charging, True, t)
+            return BatteryReading(int(round(float(props["Percentage"]))), None, True, t)
     except Exception:  # D-Bus missing/unavailable: treat as "no live reading"
         return None
     return None

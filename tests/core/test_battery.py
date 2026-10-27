@@ -45,11 +45,11 @@ def test_keyboard_battery_unknown_when_never_seen(tmp_path):
 
 def test_upower_finds_keyboard_by_model():
     bus = FakeBus({
-        "/other": {"Model": "Mouse", "Percentage": 50.0},
+        "/other": {"Model": "Mouse", "Percentage": 50.0, "IsPresent": True},
         KBD: {"Model": "Womier WD75 BT1", "Percentage": 93.6, "State": 1, "IsPresent": True},
     })
     r = read_upower_keyboard(bus, now=7.0)
-    assert (r.level, r.charging, r.live, r.measured_at) == (94, True, True, 7.0)
+    assert (r.level, r.charging, r.live, r.measured_at) == (94, None, True, 7.0)
 
 
 def test_upower_not_present_is_none():
@@ -59,10 +59,10 @@ def test_upower_not_present_is_none():
 
 def test_upower_mac_path_needs_matching_model():
     bus = FakeBus({KBD: {"Model": "Other Keyboard", "NativePath": "dev_00_60_A3_43_B0_64",
-                         "Percentage": 80.0}})
+                         "Percentage": 80.0, "IsPresent": True}})
     assert read_upower_keyboard(bus) is None
     bus = FakeBus({KBD: {"Model": "WD75 BT", "NativePath": "dev_00_60_A3_43_B0_64",
-                         "Percentage": 80.0}})
+                         "Percentage": 80.0, "IsPresent": True}})
     assert read_upower_keyboard(bus).level == 80
 
 
@@ -74,3 +74,8 @@ def test_upower_no_device_or_bus_error():
             raise RuntimeError("no bus")
 
     assert read_upower_keyboard(Broken({})) is None
+
+
+def test_upower_missing_is_present_fails_closed():
+    bus = FakeBus({KBD: {"Model": "Womier WD75 BT1", "Percentage": 94.0}})
+    assert read_upower_keyboard(bus) is None
