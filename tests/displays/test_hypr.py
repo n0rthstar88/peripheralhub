@@ -124,3 +124,84 @@ def test_tick_reverts_at_zero():
     assert left == list(range(14, -1, -1))
     assert rec.applied == [NEW, OLD] and rec.written == []
     assert c.tick() == 0 and rec.applied == [NEW, OLD]  # no second revert
+
+
+class Flaky(Rec):
+    """apply raises on the calls whose 1-based index is in `fail`."""
+
+    def __init__(self, fail, exc=ApplyError("boom")):
+        super().__init__()
+        self.fail, self.exc = set(fail), exc
+
+    def apply(self, ms):
+        self.applied.append(ms)
+        if len(self.applied) in self.fail:
+            raise self.exc
+
+
+def test_cancel_revert_failure_does_not_raise_and_retry_works():
+    rec = Flaky({2})
+    c = ctl(rec)
+    c.start(NEW)
+    c.cancel()
+    assert c.state == "revert_failed" and isinstance(c.last_error, ApplyError)
+    assert c.retry_revert() is True
+    assert c.state == "reverted" and c.last_error is None
+    assert rec.applied == [NEW, OLD, OLD] and rec.written == []
+
+
+def test_tick_to_zero_revert_failure_does_not_raise():
+    rec = Flaky({2})
+    c = ctl(rec, seconds=2)
+    c.start(NEW)
+    assert c.tick() == 1
+    assert c.tick() == 0
+    assert c.state == "revert_failed"
+    assert c.tick() == 0 and len(rec.applied) == 2
+    assert c.retry_revert() and c.state == "reverted"
+    with pytest.raises(RuntimeError):
+        c.keep()
+
+
+def test_start_double_failure_names_both():
+    rec = Flaky({1, 2}, ApplyError("boom"))
+    c = ctl(rec)
+    with pytest.raises(ApplyError, match="revert failed") as ei:
+        c.start(NEW)
+    assert isinstance(ei.value.__cause__, ApplyError)
+    assert c.state == "revert_failed" and rec.written == []
+    assert c.retry_revert() is True and c.state == "reverted"
+
+
+def test_start_non_applyerror_triggers_revert():
+    rec = Flaky({1}, ValueError("weird"))
+    c = ctl(rec)
+    with pytest.raises(ApplyError) as ei:
+        c.start(NEW)
+    assert isinstance(ei.value.__cause__, ValueError)
+    assert rec.applied == [NEW, OLD] and c.state == "reverted"
+
+
+def test_apply_monitors_timeout_becomes_applyerror():
+    seen = {}
+
+    def run(cmd, **kw):
+        seen.update(kw)
+        raise subprocess.TimeoutExpired(cmd, 5)
+
+    with pytest.raises(ApplyError):
+        apply_monitors(NEW, run)
+    assert seen["timeout"] == 5
+
+
+def test_controller_path_is_required():
+    with pytest.raises(TypeError):
+        RevertController(OLD)  # type: ignore[call-arg]
+
+
+def test_read_monitors_rotated_keeps_reported_size():
+    import json
+    d = json.loads(FIXTURE)[1]
+    d["transform"] = 1
+    ms = read_monitors(lambda cmd, **kw: cp(out=json.dumps([d])))
+    assert (ms[0].width, ms[0].height, ms[0].transform) == (1920, 1080, 1)
