@@ -208,6 +208,7 @@ class MacrosPage:
         self._root.append(self._battery)
         self._root.append(self._gate)
         self._root.connect("unrealize", lambda _w: self._stop_recording())
+        self._root.connect("unmap", lambda _w: self._stop_recording())
         self._slots.select_row(self._slot_rows[0])
         self._rebuild()
 
@@ -459,7 +460,10 @@ class MacrosPage:
 
     def _start_recording(self) -> None:
         win = self._root.get_root()
-        if self._rec is not None or win is None:
+        if self._rec is not None:
+            return
+        if win is None:
+            self._record.set_active(False)
             return
         self._rec = Recorder()
         ctl = Gtk.EventControllerKey(propagation_phase=Gtk.PropagationPhase.CAPTURE)
@@ -472,7 +476,7 @@ class MacrosPage:
     def _on_key(self, _ctl, *args) -> bool:
         _keyval, keycode, _state, pressed = args
         hid = evdev_to_hid(keycode - 8)
-        if self._rec is None or hid is None:
+        if self._rec is None or hid is None or not self._root.get_mapped():
             return False
         self._rec.event(hid, pressed, GLib.get_monotonic_time() // 1000)
         return True
