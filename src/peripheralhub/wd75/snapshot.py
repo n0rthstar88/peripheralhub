@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -68,8 +69,10 @@ def save_snapshot(s: Snapshot, path: str | PathLike) -> None:
             "color_hs": [s.rgb.hue, s.rgb.saturation],
         },
     }
-    with open(path, "w") as f:
+    tmp = f"{os.fspath(path)}.tmp"
+    with open(tmp, "w") as f:
         json.dump(d, f, indent=1)
+    os.replace(tmp, path)
 
 
 def factory_snapshot() -> Snapshot:
