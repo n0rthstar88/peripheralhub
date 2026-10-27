@@ -41,6 +41,12 @@ def _rect(m: Monitor) -> tuple[float, float, float, float]:
     return m.x, m.y, m.x + w, m.y + h
 
 
+def overlaps(a: Monitor, b: Monitor) -> bool:
+    ax0, ay0, ax1, ay1 = _rect(a)
+    bx0, by0, bx1, by1 = _rect(b)
+    return min(ax1, bx1) - max(ax0, bx0) > _TOL and min(ay1, by1) - max(ay0, by0) > _TOL
+
+
 def snap_position(
     moving: Monitor, others: list[Monitor], x: float, y: float, threshold: float = 40
 ) -> tuple[int, int]:

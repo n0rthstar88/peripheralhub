@@ -205,3 +205,70 @@ def test_read_monitors_rotated_keeps_reported_size():
     d["transform"] = 1
     ms = read_monitors(lambda cmd, **kw: cp(out=json.dumps([d])))
     assert (ms[0].width, ms[0].height, ms[0].transform) == (1920, 1080, 1)
+
+
+def _mon(name, w, h, x=0, y=0, transform=0):
+    return Monitor(name, name, w, h, 60.0, x, y, 1.0, transform, [f"{w}x{h}@60"])
+
+
+def _simulate(current, steps):
+    from peripheralhub.displays.model import overlaps
+    state = {m.name: m for m in current}
+    for s in steps:
+        state[s.name] = s
+        live = [m for m in state.values() if not m.disabled]
+        for i, a in enumerate(live):
+            for b in live[i + 1:]:
+                assert not overlaps(a, b), f"{a.name} overlaps {b.name} after applying {s}"
+    return state
+
+
+def test_apply_order_revert_after_left_monitor_rotated_never_overlaps():
+    from peripheralhub.displays.hypr import apply_order
+    current = [_mon("DP-1", 2560, 1080, 0, 0, transform=1), _mon("HDMI-A-1", 1920, 1080, 1080, 0)]
+    target = [_mon("DP-1", 2560, 1080, 0, 0), _mon("HDMI-A-1", 1920, 1080, 2560, 0)]
+    steps = apply_order(current, target)
+    state = _simulate(current, steps)
+    assert [state[m.name] for m in target] == target
+    assert [s.name for s in steps] == ["HDMI-A-1", "DP-1"]
+
+
+def test_apply_order_swap_parks_one_monitor():
+    from peripheralhub.displays.hypr import apply_order
+    current = [_mon("A", 100, 100, 0), _mon("B", 100, 100, 100)]
+    target = [_mon("A", 100, 100, 100), _mon("B", 100, 100, 0)]
+    steps = apply_order(current, target)
+    state = _simulate(current, steps)
+    assert [state[m.name] for m in target] == target
+    assert len(steps) == 3
+
+
+def test_apply_order_keeps_order_when_nothing_moves():
+    from peripheralhub.displays.hypr import apply_order
+    ms = [_mon("A", 100, 100, 0), _mon("B", 100, 100, 100)]
+    assert apply_order(ms, ms) == ms
+
+
+def test_apply_live_reads_current_state_first():
+    import json
+    from peripheralhub.displays.hypr import apply_live
+    calls = []
+
+    def run(cmd, **kw):
+        calls.append(cmd)
+        if cmd[:2] == ["hyprctl", "monitors"]:
+            return cp(out=json.dumps([
+                {"name": "DP-1", "description": "", "width": 2560, "height": 1080, "refreshRate": 60.0,
+                 "x": 0, "y": 0, "scale": 1.0, "transform": 1, "availableModes": []},
+                {"name": "HDMI-A-1", "description": "", "width": 1920, "height": 1080, "refreshRate": 60.0,
+                 "x": 1080, "y": 0, "scale": 1.0, "transform": 0, "availableModes": []}]))
+        return cp()
+
+    apply_live([_mon("DP-1", 2560, 1080, 0, 0), _mon("HDMI-A-1", 1920, 1080, 2560, 0)], run)
+    evals = [c[2] for c in calls if c[1] == "eval"]
+    assert "HDMI-A-1" in evals[0] and "DP-1" in evals[1]
+
+
+def test_controller_defaults_to_apply_live():
+    from peripheralhub.displays.hypr import apply_live
+    assert RevertController([], path="x")._apply is apply_live
