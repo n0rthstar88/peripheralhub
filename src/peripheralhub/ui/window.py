@@ -21,6 +21,7 @@ from peripheralhub.ui.battery import BatteryWidget  # noqa: E402
 from peripheralhub.ui.pages import kb_lighting  # noqa: E402,F401  (registers the Lighting tab)
 from peripheralhub.ui.pages import kb_keymap  # noqa: E402,F401  (registers the Keymap tab)
 from peripheralhub.ui.pages import kb_macros  # noqa: E402,F401  (registers the Macros tab)
+from peripheralhub.ui.pages.displays import displays_page  # noqa: E402
 from peripheralhub.ui.pages.kb_common import keyboard_page  # noqa: E402
 from peripheralhub.ui.pages.mouse_dpi import mouse_page  # noqa: E402
 from peripheralhub.wd75.device import Wd75  # noqa: E402
@@ -102,6 +103,7 @@ PAGES: dict[str, Callable[[AppContext], DevicePage]] = {
 }
 PAGES["wd75"] = keyboard_page
 PAGES["basilisk"] = mouse_page
+PAGES["displays"] = displays_page
 
 
 def safe(fn: Callable[[], object], what: str) -> bool:
