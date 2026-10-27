@@ -44,6 +44,7 @@ class Registry:
         self._subscribers: list[Callable[[list[DeviceStatus]], None]] = []
         self._wd_state = "disconnected"
         self._wd_connection: Connection = Connection.DISCONNECTED
+        self._wd_key: tuple | None = None
         self._mouse_state = "disconnected"
         self._kb_battery: BatteryReading | None = None
         self._last_live: BatteryReading | None = None
@@ -78,24 +79,48 @@ class Registry:
     def _recompute_keyboard(self, live: BatteryReading | None) -> None:
         self._kb_battery = keyboard_battery(live, self._wd_connection, self._settings, self._clock())
 
-    def poll_devices(self) -> list[DeviceStatus]:
-        previous = self._wd_connection
+    def _poll_keyboard(self, force: bool) -> None:
+        """Probe cheaply; only a connection/node change (or force) triggers the heavy refresh()."""
         try:
-            self._wd_state = self._wd75.refresh().value
+            key = (self._wd75.probe(), self._wd75.node_path)
+            if force or key != self._wd_key:
+                if self._wd75.busy:
+                    return  # a write is in flight: retry on the next poll
+                self._wd_state = self._wd75.refresh().value
+                self._wd_key = key
             self._wd_connection = self._wd75.connection
         except Exception:
-            self._wd_state, self._wd_connection = "disconnected", Connection.DISCONNECTED
+            self._wd_state, self._wd_connection, self._wd_key = "disconnected", Connection.DISCONNECTED, None
+
+    def poll_devices(self) -> list[DeviceStatus]:
+        previous = self._wd_connection
+        self._poll_keyboard(force=False)
+        self._after_keyboard(previous)
+        return self.statuses()
+
+    def refresh_keyboard(self) -> list[DeviceStatus]:
+        """Explicit re-check (e.g. a page's Retry button): opens the VIA node and queries it."""
+        previous = self._wd_connection
+        self._poll_keyboard(force=True)
+        self._after_keyboard(previous)
+        return self.statuses()
+
+    def _after_keyboard(self, previous: Connection) -> None:
         if self._kb_battery is None or self._wd_connection != previous:
             live = self._last_live if self._wd_connection is Connection.BLUETOOTH else None
             self._recompute_keyboard(live)
         self._poll_basilisk()
         self._update()
-        return self.statuses()
 
     def _poll_basilisk(self) -> None:
         if self._basilisk.state == "ready":
-            self._mouse_state = "ready"
-            return
+            try:
+                if self._basilisk.present():
+                    self._mouse_state = "ready"
+                    return
+                self._basilisk.close()
+            except Exception:
+                pass
         try:
             self._basilisk.open()
         except Exception:  # PermissionError sets basilisk.state itself

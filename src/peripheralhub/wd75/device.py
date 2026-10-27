@@ -1,6 +1,8 @@
 """WD75 connection detection, reachability state, and safe (backed-up) writes."""
 from __future__ import annotations
 
+import functools
+import threading
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -45,6 +47,20 @@ def detect_connection(nodes: list[HidrawNode]) -> tuple[Connection, HidrawNode |
     return Connection.DISCONNECTED, None
 
 
+def _writing(fn):
+    """Mark the device busy for the duration of a write so refresh() leaves the transport alone."""
+    @functools.wraps(fn)
+    def wrapper(self, *a, **kw):
+        with self._busy_lock:
+            self._busy += 1
+        try:
+            return fn(self, *a, **kw)
+        finally:
+            with self._busy_lock:
+                self._busy -= 1
+    return wrapper
+
+
 class Wd75:
     def __init__(self, backup_dir: str, transport_factory=HidrawTransport, node_lister=list_nodes) -> None:
         self._backup_dir = Path(backup_dir)
@@ -54,6 +70,10 @@ class Wd75:
         self._backup_path: str | None = None
         self.connection = Connection.DISCONNECTED
         self.via: ViaClient | None = None
+        self.state = Wd75State.DISCONNECTED
+        self._busy = 0
+        self._busy_lock = threading.Lock()
+        self.node_path: str | None = None
 
     def _drop_transport(self) -> None:
         close = getattr(self._transport, "close", None)
@@ -62,7 +82,23 @@ class Wd75:
         self._transport = None
         self.via = None
 
+    @property
+    def busy(self) -> bool:
+        return self._busy > 0
+
+    def probe(self) -> Connection:
+        """Cheap presence check: lists hidraw nodes, opens nothing, sends no VIA."""
+        self.connection, node = detect_connection(self._list())
+        self.node_path = node.path if node else None
+        return self.connection
+
     def refresh(self) -> Wd75State:
+        if self.busy:
+            return self.state
+        self.state = self._refresh()
+        return self.state
+
+    def _refresh(self) -> Wd75State:
         self._drop_transport()
         self.connection, node = detect_connection(self._list())
         if self.connection == Connection.DISCONNECTED:
@@ -110,10 +146,12 @@ class Wd75:
             self._backup_path = str(path)
         return self._backup_path
 
+    @_writing
     def write_keycode(self, layer: int, row: int, col: int, code: int) -> None:
         self.ensure_backup()
         self._require_via().set_keycode(layer, row, col, code)
 
+    @_writing
     def apply_rgb(self, **changes: int) -> None:
         """Preview RGB changes (VIA 0x07 only, not saved to the keyboard)."""
         unknown = set(changes) - {"brightness", "effect", "speed", "hue", "saturation"}
@@ -131,14 +169,17 @@ class Wd75:
             cur = via.get_rgb()
             via.set_color(changes.get("hue", cur.hue), changes.get("saturation", cur.saturation))
 
+    @_writing
     def save_rgb(self) -> None:
         self.ensure_backup()
         self._require_via().save_rgb()
 
+    @_writing
     def write_macros(self, buf: bytes) -> None:
         self.ensure_backup()
         self._require_via().write_macro_buffer(buf)
 
+    @_writing
     def restore(self, target: Snapshot, **scope) -> int:
         """Write back keys that differ from target (scope: layers=, keys=). Returns keys written."""
         self.ensure_backup()

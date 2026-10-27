@@ -7,19 +7,30 @@ from peripheralhub.wd75.device import Connection, Wd75State
 class FakeWd75:
     def __init__(self, connection=Connection.DONGLE, state=Wd75State.READY):
         self.connection, self.state = connection, state
+        self.node_path, self.busy, self.refreshes = "/dev/hidraw1", False, 0
+
+    def probe(self):
+        return self.connection
 
     def refresh(self):
+        self.refreshes += 1
         return self.state
 
 
 class FakeBasilisk:
     def __init__(self, state="ready"):
-        self.target, self.state, self.opens = state, "disconnected", 0
+        self.target, self.state, self.opens, self.plugged = state, "disconnected", 0, True
 
     def open(self):
         self.opens += 1
-        self.state = self.target
+        self.state = self.target if self.plugged else "disconnected"
         return self.state == "ready"
+
+    def present(self):
+        return self.plugged
+
+    def close(self):
+        self.state = "disconnected"
 
 
 def make(tmp_path, wd75=None, basilisk=None, headset=None, subscribe=True):
@@ -81,7 +92,7 @@ def test_headset_present_and_device_errors_become_state(tmp_path):
             raise PermissionError
 
     class BoomWd(FakeWd75):
-        def refresh(self):
+        def probe(self):
             raise OSError("gone")
 
     reading = BatteryReading(55, False, True, 1.0)
@@ -92,3 +103,39 @@ def test_headset_present_and_device_errors_become_state(tmp_path):
     assert s["headset"].state == "connected" and s["headset"].battery == reading
     assert s["basilisk"].state == "no_permission"
     assert s["wd75"].state == "disconnected"
+
+
+def test_steady_state_polls_do_not_refresh_and_change_refreshes_once(tmp_path):
+    reg, wd75, _, _ = make(tmp_path)
+    for _ in range(5):
+        reg.poll_devices()
+    assert wd75.refreshes == 1
+    wd75.connection = Connection.USB
+    reg.poll_devices()
+    reg.poll_devices()
+    assert wd75.refreshes == 2
+    reg.refresh_keyboard()
+    assert wd75.refreshes == 3
+
+
+def test_refresh_skipped_while_busy_then_retried(tmp_path):
+    reg, wd75, _, _ = make(tmp_path)
+    wd75.busy = True
+    reg.poll_devices()
+    assert wd75.refreshes == 0
+    wd75.busy = False
+    reg.poll_devices()
+    assert wd75.refreshes == 1
+
+
+def test_basilisk_unplug_and_replug(tmp_path):
+    reg, _, mouse, _ = make(tmp_path)
+    reg.poll_devices()
+    assert by_id(reg.statuses())["basilisk"].state == "ready"
+    mouse.plugged = False
+    reg.poll_devices()
+    assert by_id(reg.statuses())["basilisk"].state == "disconnected"
+    mouse.plugged = True
+    reg.poll_devices()
+    assert by_id(reg.statuses())["basilisk"].state == "ready"
+    assert mouse.opens == 3

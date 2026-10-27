@@ -54,6 +54,7 @@ class Basilisk:
         self._open = opener
         self._sleep = sleep
         self._hid = None
+        self._path: str | None = None
         self.state = "disconnected"
 
     def open(self) -> bool:
@@ -64,11 +65,19 @@ class Basilisk:
             return False
         try:
             self._hid = self._open(nodes[0].path)
+            self._path = nodes[0].path
         except PermissionError:
             self.state = "no_permission"
             raise
         self.state = "ready"
         return True
+
+    def present(self) -> bool:
+        """True while the opened node is still listed (no device I/O)."""
+        try:
+            return self._hid is not None and any(n.path == self._path for n in self._list())
+        except OSError:
+            return False
 
     def close(self) -> None:
         if self._hid is not None:
