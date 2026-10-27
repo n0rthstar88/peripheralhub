@@ -1,0 +1,171 @@
+{
+  "name": "WD75",
+  "vendorId": "0x8888",
+  "productId": "0x2222",
+  "menus": ["qmk_rgb_matrix"],
+  "matrix": {"rows": 6, "cols": 16},
+  "customKeycodes": [
+    {"name": "BAT Query","title": "BAT Query","shortName": "BATQ"},
+    {"name": "BT Ch1","title": "Bluetooth Chennel1","shortName": "BT1"},
+    {"name": "BT Ch2","title": "Bluetooth Chennel2","shortName": "BT2"},
+    {"name": "BT Ch3","title": "Bluetooth Chennel3","shortName": "BT3"},
+    {"name": "2.4GHz","title": "2.4GHz","shortName": "2G4"},
+    {"name": "Win Lock","title": "Win Lock","shortName": "WLCK"},
+    {"name": "RGB\nOn","title": "RGB On","shortName": "RM_ON"},
+    {"name": "RGB\nOff","title": "RGB Off","shortName": "RM_OFF"},
+    {"name": "RGB Toggle","title": "RGB Toggle","shortName": "RM_TOG"},
+    {"name": "RGB Mode","title": "RGB Mode","shortName": "RM_MOD"},
+    {"name": "RGB Hue","title": "RGB Next Hue","shortName": "RM_HUE"},
+    {"name": "RGB Val+","title": "RGB Val+","shortName": "RM_VAI"},
+    {"name": "RGB Val-","title": "RGB Val-","shortName": "RM_VAD"},
+    {"name": "RGB Speed+","title": "RGB Speed+","shortName": "RM_SPI"},
+    {"name": "RGB Speed-","title": "RGB Speed-","shortName": "RM_SPD"},
+    {"name": "Heart Toggle","title": "Heart Toggle","shortName": "HT_TOG"},
+    {"name": "Heart Hue","title": "Heart Next Hue","shortName": "HT_HUE"}
+  ],
+  "layouts": {
+    "keymap": [
+      	[
+            {
+            "c": "#337AB7",
+            "t": "#FFFFFF"
+            },
+            "0,0",
+            {
+            "c": "#cccccc",
+            "t": "#000000"
+            },
+            "0,1",
+            "0,2",
+            "0,3",
+            "0,4",
+            "0,5",
+            "0,6",
+            "0,7",
+            "0,8",
+            "0,9",
+            "0,10",
+            "0,11",
+            "0,12",
+            "0,13",
+            "0,14",
+            "0,15"
+        ],
+        [
+            "1,0",
+            "1,1",
+            "1,2",
+            "1,3",
+            "1,4",
+            "1,5",
+            "1,6",
+            "1,7",
+            "1,8",
+            "1,9",
+            "1,10",
+            "1,11",
+            "1,12",
+            {
+            "w": 2
+            },
+            "1,13",
+            "1,14"
+        ],
+        [
+            {
+            "w": 1.5
+            },
+            "2,0",
+            "2,1",
+            "2,2",
+            "2,3",
+            "2,4",
+            "2,5",
+            "2,6",
+            "2,7",
+            "2,8",
+            "2,9",
+            "2,10",
+            "2,11",
+            "2,12",
+            {
+            "w": 1.5
+            },
+            "2,13",
+            "2,14"
+        ],
+        [
+            {
+            "w": 1.75
+            },
+            "3,0",
+            "3,1",
+            "3,2",
+            "3,3",
+            "3,4",
+            "3,5",
+            "3,6",
+            "3,7",
+            "3,8",
+            "3,9",
+            "3,10",
+            "3,11",
+            {
+            "c": "#337AB7",
+            "w": 2.25
+            },
+            "3,12",
+            {
+            "c": "#cccccc"
+            },
+            "3,14"
+        ],
+        [
+            {
+            "w": 2.25
+            },
+            "4,0",
+            "4,1",
+            "4,2",
+            "4,3",
+            "4,4",
+            "4,5",
+            "4,6",
+            "4,7",
+            "4,8",
+            "4,9",
+            "4,10",
+            {
+            "w": 1.75
+            },
+            "4,11",
+            "4,12",
+            "4,14"
+        ],
+        [
+            {
+            "w": 1.25
+            },
+            "5,0",
+            {
+            "w": 1.25
+            },
+            "5,1",
+            {
+            "w": 1.25
+            },
+            "5,2",
+            {
+            "w": 6.25
+            },
+            "5,3",
+            "5,8",
+            "5,9",
+            "5,10",
+            "5,11",
+            "5,12",
+            "5,14"
+        ]
+    ]
+  }
+}
