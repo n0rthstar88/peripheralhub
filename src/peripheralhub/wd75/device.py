@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import functools
+import os
 import threading
 from datetime import datetime
 from enum import Enum
@@ -194,3 +195,23 @@ class Wd75:
         for layer, row, col, code in plan:
             via.set_keycode(layer, row, col, code)
         return len(plan)
+
+
+class Wd75Probe(Wd75):
+    """Presence and connection only; never opens the VIA node.
+
+    For the background service and `phub status`, so they never send VIA traffic that could
+    interleave with the app's own requests.
+    """
+
+    def refresh(self) -> Wd75State:
+        connection = self.probe()
+        if connection == Connection.DISCONNECTED:
+            self.state = Wd75State.DISCONNECTED
+        elif self.node_path is None:
+            self.state = Wd75State.BLUETOOTH_ONLY
+        elif not os.access(self.node_path, os.R_OK | os.W_OK):
+            self.state = Wd75State.NO_PERMISSION
+        else:
+            self.state = Wd75State.READY
+        return self.state

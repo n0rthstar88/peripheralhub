@@ -1,10 +1,12 @@
 """Sysfs hidraw discovery and raw hidraw device I/O."""
 from __future__ import annotations
 
+import contextlib
 import fcntl
 import os
 import re
 import select
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -138,6 +140,16 @@ class HidrawDevice:
     def set_feature(self, report_id: int, payload: bytes) -> None:
         buf = bytearray([report_id]) + bytearray(payload)
         fcntl.ioctl(self._require_fd(), _hidiocsfeature(len(buf)), buf, True)
+
+    @contextlib.contextmanager
+    def locked(self) -> Iterator[None]:
+        """Exclusive flock on this node, so another process's request/reply pair can't interleave with ours."""
+        fd = self._require_fd()
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
 
     def close(self) -> None:
         if self._fd is not None:

@@ -189,3 +189,22 @@ def test_reset_keymap_backs_up_first_is_busy_and_sends_once(tmp_path):
     assert seen == {"busy": True, "backups": 1}
     assert [p for p in kb.sent if p[0] == 0x06] == [b"\x06" + bytes(31)]
     assert not wd.busy
+
+
+def test_probe_only_never_opens_the_device(tmp_path):
+    from peripheralhub.wd75.device import Wd75Probe
+
+    def no_open(path):
+        raise AssertionError("probe-only must not open the VIA node")
+
+    readable = tmp_path / "hidraw1"
+    readable.write_bytes(b"")
+    nodes = [node(str(readable), name="Womier Womier WD75 2.4G")]
+    w = Wd75Probe(str(tmp_path), transport_factory=no_open, node_lister=lambda: nodes)
+    assert w.refresh() == Wd75State.READY and w.connection == Connection.DONGLE
+    nodes[:] = [node(str(tmp_path / "missing"), name="Womier WD75")]
+    assert w.refresh() == Wd75State.NO_PERMISSION
+    nodes[:] = [node(bus=0x05, name="WD75")]
+    assert w.refresh() == Wd75State.BLUETOOTH_ONLY
+    nodes[:] = []
+    assert w.refresh() == Wd75State.DISCONNECTED

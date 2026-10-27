@@ -1,6 +1,7 @@
 """Razer Basilisk V3 over hidraw (USB interface 3)."""
 from __future__ import annotations
 
+import contextlib
 import time
 from collections.abc import Callable
 
@@ -20,13 +21,15 @@ _STATUS_NAMES = {p.FAIL: "FAIL", p.TIMEOUT: "TIMEOUT", p.UNSUPPORTED: "UNSUPPORT
 
 def transact(hid, report: bytes, sleep: Callable[[float], None] = time.sleep) -> p.Report:
     """Send one 90-byte report and return the parsed reply."""
+    lock = getattr(hid, "locked", contextlib.nullcontext)
     try:
-        for _ in range(MAX_ATTEMPTS):
-            hid.set_feature(0, report)
-            sleep(0.0006)
-            reply = p.parse_report(hid.get_feature(0, p.REPORT_LEN))
-            if reply.status != p.BUSY:
-                break
+        with lock():
+            for _ in range(MAX_ATTEMPTS):
+                hid.set_feature(0, report)
+                sleep(0.0006)
+                reply = p.parse_report(hid.get_feature(0, p.REPORT_LEN))
+                if reply.status != p.BUSY:
+                    break
     except OSError as e:
         raise RazerError(f"I/O error: {e}") from e
     if reply.status != p.OK:

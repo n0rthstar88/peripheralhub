@@ -25,6 +25,7 @@ DEFAULT_PATH = "~/.config/peripheralhub/settings.json"
 class Settings:
     def __init__(self, path: str = DEFAULT_PATH) -> None:
         self.path = Path(path).expanduser()
+        self._mtime = self.mtime()
         self._data: dict[str, Any] = self._load()
 
     def _load(self) -> dict[str, Any]:
@@ -42,7 +43,13 @@ class Settings:
             node = node[part]
         return node
 
+    def reload(self) -> None:
+        self._mtime = self.mtime()
+        self._data = self._load()
+
     def set(self, key: str, value: Any) -> None:
+        if self.mtime() != self._mtime:  # another process (app or service) saved since: merge onto theirs
+            self.reload()
         parts = key.split(".")
         node = self._data
         for part in parts[:-1]:
@@ -64,3 +71,4 @@ class Settings:
         tmp = self.path.with_name(self.path.name + ".tmp")
         tmp.write_text(json.dumps(self._data, indent=2, sort_keys=True))
         os.replace(tmp, self.path)
+        self._mtime = self.mtime()

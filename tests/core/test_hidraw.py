@@ -45,3 +45,22 @@ def test_unreadable_node_is_skipped(fake_sysfs):
 
 def test_missing_sysfs_root_gives_empty_list(tmp_path):
     assert list_nodes(str(tmp_path / "nope"), "/dev") == []
+
+
+def test_locked_excludes_other_open_files(tmp_path):
+    import fcntl
+    import os
+    import pytest
+    from peripheralhub.core.hidraw import HidrawDevice
+    f = tmp_path / "node"
+    f.write_bytes(b"")
+    a = HidrawDevice(str(f))
+    other = os.open(str(f), os.O_RDWR)
+    try:
+        with a.locked():
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(other, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(other, fcntl.LOCK_EX | fcntl.LOCK_NB)  # released after the block
+    finally:
+        os.close(other)
+        a.close()

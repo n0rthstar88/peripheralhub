@@ -119,3 +119,27 @@ def test_matrix_and_zones_pinned():
     assert Basilisk.MATRIX_COLS == 11
     assert Basilisk.ZONES == {"logo": range(0, 1), "wheel": range(1, 2), "strip": range(2, 11)}
     assert Basilisk.EFFECTS == ("off", "static", "spectrum", "wave")
+
+
+def test_transact_holds_device_lock():
+    import contextlib
+    from peripheralhub.basilisk import protocol as p
+    from peripheralhub.basilisk.device import transact
+    events = []
+
+    class Hid:
+        @contextlib.contextmanager
+        def locked(self):
+            events.append("lock")
+            yield
+            events.append("unlock")
+
+        def set_feature(self, rid, report):
+            events.append("set")
+
+        def get_feature(self, rid, n):
+            events.append("get")
+            return bytes([p.OK]) + bytes(n - 1)
+
+    transact(Hid(), p.get_dpi(), sleep=lambda s: None)
+    assert events[0] == "lock" and events[-1] == "unlock" and "set" in events
