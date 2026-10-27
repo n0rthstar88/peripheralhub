@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=PeripheralHub
+Comment=Keyboard, mouse, display and battery settings
+Exec=peripheralhub
+Icon=dev.hufflabs.PeripheralHub
+Terminal=false
+Categories=Settings;HardwareSettings;
+StartupWMClass=dev.hufflabs.PeripheralHub
