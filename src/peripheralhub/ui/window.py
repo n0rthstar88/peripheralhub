@@ -5,7 +5,7 @@ import sys
 import time
 import traceback
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 import gi
@@ -15,6 +15,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, GLib, Gtk  # noqa: E402
 
 from peripheralhub.basilisk.device import Basilisk  # noqa: E402
+from peripheralhub.core.extensions import LoadError, Peripheral  # noqa: E402
 from peripheralhub.core.notify import AppBatteryWatch, LowBatteryNotifier  # noqa: E402
 from peripheralhub.core.registry import DeviceStatus, Registry  # noqa: E402
 from peripheralhub.core.settings import Settings  # noqa: E402
@@ -22,6 +23,7 @@ from peripheralhub.ui.battery import BatteryWidget  # noqa: E402
 from peripheralhub.ui.pages import kb_lighting  # noqa: E402,F401  (registers the Lighting tab)
 from peripheralhub.ui.pages import kb_keymap  # noqa: E402,F401  (registers the Keymap tab)
 from peripheralhub.ui.pages import kb_macros  # noqa: E402,F401  (registers the Macros tab)
+from peripheralhub.ui.pages.custom import CustomDevicePage  # noqa: E402
 from peripheralhub.ui.pages.displays import displays_page  # noqa: E402
 from peripheralhub.ui.pages.headset import headset_page  # noqa: E402
 from peripheralhub.ui.pages.kb_common import keyboard_page  # noqa: E402
@@ -36,6 +38,7 @@ class AppContext:
     registry: Registry  # pages may call registry.refresh_keyboard()
     wd75: Wd75
     basilisk: Basilisk
+    load_errors: list[LoadError] = field(default_factory=list)
 
 
 class DevicePage(Protocol):
@@ -171,7 +174,10 @@ class MainWindow(Adw.ApplicationWindow):
 
         self._list = Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE)
         self._list.add_css_class("navigation-sidebar")
-        for spec in SIDEBAR:
+        self._extras = {d.id: d for d in ctx.registry.extras}
+        self._specs = [r for r in SIDEBAR if r[0] not in ctx.registry.hidden]
+        self._specs += [(d.id, d.title, d.icon, d.has_battery, d.hint) for d in ctx.registry.extras]
+        for spec in self._specs:
             self._add_row(self._list, spec)
         self._pinned = Gtk.ListBox(selection_mode=Gtk.SelectionMode.SINGLE)
         self._pinned.add_css_class("navigation-sidebar")
@@ -193,7 +199,10 @@ class MainWindow(Adw.ApplicationWindow):
 
         ctx.registry.subscribe(self._on_statuses)
         self._on_statuses(ctx.registry.statuses())
-        self._list.select_row(self._rows["wd75"])
+        if self._specs:
+            self._list.select_row(self._rows[self._specs[0][0]])
+        else:
+            self._pinned.select_row(self._rows["settings"])
 
         safe(ctx.registry.poll_devices, "device poll")
         safe(ctx.registry.poll_batteries, "battery poll")
@@ -213,12 +222,22 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _page(self, device_id: str) -> DevicePage:
         if device_id not in self._pages:
-            page = PAGES[device_id](self._ctx)
+            device = self._extras.get(device_id)
+            page = self._extra_page(device) if device is not None else PAGES[device_id](self._ctx)
             self._pages[device_id] = page
             for s in self._ctx.registry.statuses():
                 if s.id == device_id:
                     self._safe_status(page, s)
         return self._pages[device_id]
+
+    def _extra_page(self, device: Peripheral) -> DevicePage:
+        try:
+            page = device.page(self._ctx)
+        except Exception:
+            print(f"peripheralhub: page for {device.id} failed", file=sys.stderr)
+            traceback.print_exc()
+            page = None
+        return page if page is not None else CustomDevicePage(device)
 
     def _show(self, device_id: str) -> None:
         if device_id not in self._nav:
@@ -229,7 +248,7 @@ class MainWindow(Adw.ApplicationWindow):
             if isinstance(content, Adw.ViewStack):
                 header.set_title_widget(Adw.ViewSwitcher(stack=content, policy=Adw.ViewSwitcherPolicy.WIDE))
             view.add_top_bar(header)
-            title = next(r[1] for r in [*SIDEBAR, SETTINGS_ROW] if r[0] == device_id)
+            title = next(r[1] for r in [*self._specs, SETTINGS_ROW] if r[0] == device_id)
             self._nav[device_id] = Adw.NavigationPage.new(view, title)
         self._split.set_content(self._nav[device_id])
         self._split.set_show_content(True)

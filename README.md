@@ -18,7 +18,7 @@ The screenshots show the app running against real, connected hardware.
 - **Displays:** drag to arrange monitors, and change resolution, refresh rate, scale and rotation. Every change reverts by itself after 15 seconds unless you press Keep.
 - **Batteries:** animated battery levels for the keyboard and the SteelSeries Arctis Nova 7P headset, with a low-battery notification.
 - **Background service and CLI:** a small user service and the `phub` command-line tool.
-- **Fully customizable:** the code is open and split by device and platform, so you can change it to add your own peripherals or run on other platforms. See [Customizing](#customizing).
+- **Customizable:** add your own peripherals with a small config file or a Python plugin, hide the ones you don't own, and swap out the Displays page on other Linux desktops, all without changing the app's code. See [Customizing](#customizing).
 
 ## Screenshots
 
@@ -34,6 +34,10 @@ The screenshots show the app running against real, connected hardware.
 |---|---|
 | ![Displays](docs/screenshots/displays.png) | ![Headset](docs/screenshots/headset.png) |
 
+| Custom devices added from config files and a plugin |
+|---|
+| ![Custom devices](docs/screenshots/custom-device.png) |
+
 ## Compatibility
 
 Built and tested on **Omarchy 4.0.6 (Quattro)** with Hyprland 0.56.2, GTK 4.24 and libadwaita 1.10. The Displays page reads and edits the Lua `~/.config/hypr/monitors.lua` that Omarchy 4 uses. Other distros and older Omarchy releases are untested.
@@ -46,7 +50,7 @@ Supported devices:
 | Razer Basilisk V3 | `1532:0099` | USB |
 | SteelSeries Arctis Nova 7P | via `headsetcontrol` | 2.4G dongle |
 
-Other keyboards and mice don't work out of the box, but you can add them: see [Customizing](#customizing). The keyboard code is written for the WD75's layout and firmware, so don't point it at a different board without adapting it first.
+Other peripherals don't have built-in pages, but you can add them: see [Customizing](#customizing). The keyboard code is written for the WD75's layout and firmware, so don't point it at a different board without adapting it first.
 
 ## Install
 
@@ -82,7 +86,7 @@ rm ~/.local/share/icons/hicolor/scalable/apps/dev.hufflabs.PeripheralHub.svg
 sudo rm /etc/udev/rules.d/70-peripheralhub.rules
 ```
 
-Settings are in `~/.config/peripheralhub` and keyboard backups are in `~/.local/share/peripheralhub`. Delete those too if you don't want to keep them.
+Settings, custom devices and plugins are in `~/.config/peripheralhub`, and keyboard backups are in `~/.local/share/peripheralhub`. Delete those too if you don't want to keep them.
 
 ## Command line
 
@@ -92,6 +96,7 @@ phub battery                             battery levels only
 phub snapshot OUT.json                   save keymap, lighting and macros
 phub restore-factory [--layer N] --yes   put factory keys back (all layers, or one)
 phub mouse dpi [VALUE]                   show or set DPI (100-26000)
+phub devices [--udev-rule]               list custom devices and load errors, or print udev rules
 ```
 
 ## Safety and recovery
@@ -119,40 +124,41 @@ If you need to undo something:
 
 ## Customizing
 
-PeripheralHub is completely customizable if you're willing to edit Python: you can add peripherals, remove the ones you don't own, or adapt it to another platform. Customizing means changing the code, as there's no plugin system or device config file yet. Only the setup listed under [Compatibility](#compatibility) has been tested, so test your changes carefully on your own hardware.
+You can make PeripheralHub fit your own setup without changing its code. Full details are in **[docs/CUSTOM_DEVICES.md](docs/CUSTOM_DEVICES.md)**, with samples in [`examples/`](examples).
 
-### Add a peripheral
+**Add a peripheral with a config file.** Save this as `~/.config/peripheralhub/devices/my-mouse.toml`, then run `systemctl --user restart peripheralhub` and reopen the app:
 
-1. **Write the device code.** Create `src/peripheralhub/<device>/` with its protocol and device class. `basilisk/` is the closest example for a HID device, and `headset/` shows how little is needed to wrap a command-line tool.
-2. **Report its status.** In `core/registry.py`, create the device, poll it, and add a `DeviceStatus` for it in `_build()`.
-3. **Add its page.** Write a class with `widget()` and `on_status()` (examples are in `ui/pages/`), then add the device to `SIDEBAR` and `PAGES` in `ui/window.py`. If it has a battery, add it to `_HAS_BATTERY` too.
-4. **Allow access.** Add its USB vendor and product IDs to `data/70-peripheralhub.rules` and re-run `./install.sh`.
-5. **Optional: run it in the background.** Add anything that should run without the window open to `service.py`.
+```toml
+title = "My Mouse"
+icon = "input-mouse-symbolic"
 
-For another keyboard running QMK and VIA, start from `wd75/`. `via.py`, `macros.py` and `keycodes.py` hold the VIA client, macro format and keycodes, while `device.py` and `data/` hold what's specific to the WD75, including its IDs, layout and factory snapshot. Use your own keyboard's definition and take your own factory snapshot, and keep the VIA command allowlist in place.
+[detect]
+usb = ["046d:c548"]            # from lsusb
 
-### Adapt it to another platform
+[battery]
+command = "my-battery-tool"    # prints something like 54%
 
-These are the parts tied to a specific platform:
+[[actions]]
+label = "Gaming profile"
+command = "my-tool --profile gaming"
+```
 
-| Part | Depends on | Where |
-|---|---|---|
-| Monitor control | Hyprland (`hyprctl`, `monitors.lua`) | `displays/`, `ui/pages/displays.py` |
-| Keyboard and mouse access | Linux hidraw and sysfs, udev rule | `core/hidraw.py`, `data/70-peripheralhub.rules` |
-| Macro recorder key codes | Linux input event codes | `ui/keymap_hid.py` |
-| Keyboard battery | UPower | `core/battery.py` |
-| Headset battery | `headsetcontrol` | `headset/device.py` |
-| Notifications | `notify-send` | `core/notify.py` |
-| Background service | systemd user service | `core/systemd.py`, `data/peripheralhub.service` |
-| Install | Paths and tools in `install.sh` | `install.sh` |
+It gets a sidebar entry, connection status, a battery level with low-battery alerts, and a button for each action. Config files only run the commands you give them and never write to hardware themselves.
 
-Another Linux desktop mostly needs a new display backend. Another operating system also needs replacements for device access, the installer, and the other Linux-specific parts above.
+**Go further with a Python plugin.** Drop a `.py` file into `~/.config/peripheralhub/plugins/` to add your own page, background work, or direct device access.
 
-Please read the safety rules in [CONTRIBUTING.md](CONTRIBUTING.md#hardware-safety) before writing to any new hardware. If you get something working, a pull request is welcome.
+**Hide what you don't own.** Turn devices off under Settings → Devices. The app and service then leave them alone.
+
+**Use another platform:**
+
+- **Other Linux desktops:** the Hyprland Displays page hides itself, and a config file or plugin can take its place with `replaces = "displays"`. This hasn't been tested on another desktop yet.
+- **macOS and Windows:** not supported yet. The app relies on Linux features at startup, so these would still need changes to the app's code.
+
+**Plugins and config commands run with your user's permissions, and plugins can write to hardware, so only install ones you trust.** The built-in keyboard's safety guards don't cover plugin code. To start without any of them, run `PERIPHERALHUB_SAFE_MODE=1 peripheralhub`.
 
 ## Project status
 
-Version 0.1.0, early and built for one specific desk setup. The automated test suite passes, the app is in regular use on the hardware listed above, and the Displays flow (rotate, revert, countdown expiry, Keep) has been checked on real monitors. It hasn't been tried on any other setup, so expect rough edges there.
+Version 0.2.0, early and built for one specific desk setup. The automated test suite passes, the app is in regular use on the hardware listed above, and the Displays flow (rotate, revert, countdown expiry, Keep) has been checked on real monitors. It hasn't been tried on any other setup, so expect rough edges there.
 
 ## Development
 

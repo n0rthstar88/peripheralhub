@@ -1,4 +1,4 @@
-"""Settings page: low-battery threshold, background service, backups, device access, about."""
+"""Settings page: low-battery threshold, background service, devices, backups, device access, about."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -11,6 +11,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
 
 from peripheralhub import __version__  # noqa: E402
+from peripheralhub.core.extensions import CONFIG_DIR  # noqa: E402
 from peripheralhub.core.notify import DEFAULT_THRESHOLD  # noqa: E402
 from peripheralhub.core.registry import BACKUP_DIR  # noqa: E402
 from peripheralhub.core.systemd import SERVICE  # noqa: E402
@@ -56,6 +57,8 @@ class SettingsPage:
         service.add(self._service)
         page.add(service)
 
+        page.add(self._devices_group())
+
         tools = Adw.PreferencesGroup(title="Maintenance")
         backups = Adw.ActionRow(title="Keyboard backups", subtitle=str(Path(BACKUP_DIR).expanduser()),
                                 activatable=True)
@@ -76,6 +79,48 @@ class SettingsPage:
         page.add(about)
 
         self._toasts.connect("map", lambda *_a: self._refresh_service())
+
+    def _devices_group(self) -> Adw.PreferencesGroup:
+        group = Adw.PreferencesGroup(title="Devices", description="Changes apply the next time the app and "
+                                                                  "background service start.")
+        hidden = self._ctx.settings.get("devices.hidden", [])
+        hidden = hidden if isinstance(hidden, list) else []
+        for device_id, title in (("wd75", "WD75 V2"), ("basilisk", "Basilisk V3"), ("headset", "Arctis Nova 7P")):
+            row = Adw.SwitchRow(title=title, active=device_id not in hidden)
+            row.connect("notify::active", self._on_device_toggled, device_id)
+            group.add(row)
+        for d in self._ctx.registry.extras:
+            row = Adw.SwitchRow(title=GLib.markup_escape_text(d.title), subtitle=GLib.markup_escape_text(d.source),
+                                active=True)
+            row.connect("notify::active", self._on_device_toggled, d.id)
+            group.add(row)
+        for e in self._ctx.load_errors:
+            row = Adw.ActionRow(title=GLib.markup_escape_text(f"Couldn't load {e.path.name}"),
+                                subtitle=GLib.markup_escape_text(e.message))
+            row.add_prefix(Gtk.Image.new_from_icon_name("dialog-warning-symbolic"))
+            group.add(row)
+        folder = Adw.ActionRow(title="Custom devices folder", subtitle=str(Path(CONFIG_DIR).expanduser()),
+                               activatable=True)
+        folder.add_suffix(Gtk.Image.new_from_icon_name("folder-open-symbolic"))
+        folder.connect("activated", self._on_open_config)
+        group.add(folder)
+        return group
+
+    def _on_device_toggled(self, row, _p, device_id: str) -> None:
+        hidden = self._ctx.settings.get("devices.hidden", [])
+        hidden = {h for h in hidden if isinstance(h, str)} if isinstance(hidden, list) else set()
+        hidden.discard(device_id) if row.get_active() else hidden.add(device_id)
+        self._ctx.settings.set("devices.hidden", sorted(hidden))
+        self._toast("Restart PeripheralHub to apply this")
+
+    def _on_open_config(self, _row) -> None:
+        path = Path(CONFIG_DIR).expanduser()
+        try:
+            for sub in ("devices", "plugins"):
+                (path / sub).mkdir(parents=True, exist_ok=True)
+            Gio.AppInfo.launch_default_for_uri(path.as_uri(), None)
+        except (OSError, GLib.Error) as e:
+            self._toast(f"Could not open {path}: {getattr(e, 'message', e)}")
 
     def widget(self) -> Gtk.Widget:
         return self._toasts

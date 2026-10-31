@@ -1,0 +1,16 @@
+# Copy to ~/.config/peripheralhub/devices/ and change the USB id and commands to suit your device.
+# Find the id with lsusb: "ID 046d:c548" means usb = ["046d:c548"].
+title = "Wireless Mouse"
+icon = "input-mouse-symbolic"
+hint = "Plug in the receiver"
+
+[detect]
+usb = ["046d:c548"]
+
+[battery]
+# Prints something containing a percentage, or only a number. "charging" in the output counts as charging.
+command = "upower -i \"$(upower -e | grep -i mouse | head -1)\" | awk '/percentage/ {print $2}'"
+
+[[actions]]
+label = "Open Solaar"
+command = "solaar"

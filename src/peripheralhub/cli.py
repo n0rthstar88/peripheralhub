@@ -8,6 +8,7 @@ from pathlib import Path
 
 from peripheralhub.basilisk.device import Basilisk, RazerError
 from peripheralhub.core.battery import BatteryReading, age_text
+from peripheralhub.core.extensions import Extensions, hidden_ids, load_extensions, udev_rules
 from peripheralhub.core.registry import BACKUP_DIR, DeviceStatus, Registry
 from peripheralhub.core.settings import DEFAULT_PATH, Settings
 from peripheralhub.wd75.device import Wd75, Wd75Probe, Wd75State
@@ -21,6 +22,7 @@ _STATE_TEXT = {
     "asleep": "asleep",
     "ready": "connected",
     "connected": "connected",
+    "available": "available",
     "bluetooth_only": "connected",
 }
 
@@ -38,12 +40,14 @@ def battery_text(r: BatteryReading | None, now: float) -> str:
 
 def _status_line(s: DeviceStatus, now: float) -> str:
     where = s.connection if s.connection and s.state != "disconnected" else _STATE_TEXT.get(s.state, s.state)
-    return f"{s.title:<16}{where:<14}{battery_text(s.battery, now)}".rstrip()
+    return f"{s.title:<15} {where:<14}{battery_text(s.battery, now)}".rstrip()
 
 
 def _registry() -> Registry:
     settings = Settings(DEFAULT_PATH)
-    return Registry(settings, wd75=Wd75Probe(str(Path(BACKUP_DIR).expanduser())))
+    ext = load_extensions()
+    return Registry(settings, wd75=Wd75Probe(str(Path(BACKUP_DIR).expanduser())),
+                    extras=ext.devices, hidden=hidden_ids(settings, ext.devices))
 
 
 def _polled(registry) -> list[DeviceStatus]:
@@ -63,7 +67,7 @@ def cmd_battery(registry) -> int:
     now = time.time()
     for s in _polled(registry):
         if s.battery is not None:
-            print(f"{s.title:<16}{battery_text(s.battery, now) or 'no reading yet'}")
+            print(f"{s.title:<15} {battery_text(s.battery, now) or 'no reading yet'}")
     return 0
 
 
@@ -117,6 +121,19 @@ def cmd_mouse_dpi(basilisk, value: int | None) -> int:
     return 0
 
 
+def cmd_devices(ext: Extensions, udev_rule: bool) -> int:
+    if udev_rule:
+        sys.stdout.write(udev_rules(ext.devices))
+        return 0
+    for d in ext.devices:
+        print(f"{d.id:<15} {d.title:<23} {d.source}".rstrip())
+    if not ext.devices and not ext.errors:
+        print("No custom devices. See docs/CUSTOM_DEVICES.md.")
+    for e in ext.errors:
+        print(f"Error in {e.path}: {e.message}")
+    return 1 if ext.errors else 0
+
+
 def _parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="phub", description="PeripheralHub command line")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -131,12 +148,16 @@ def _parser() -> argparse.ArgumentParser:
     msub = mouse.add_subparsers(dest="mouse_cmd", required=True)
     dpi = msub.add_parser("dpi", help="show or set DPI")
     dpi.add_argument("value", nargs="?", type=int)
+    devices = sub.add_parser("devices", help="list custom devices and any errors loading them")
+    devices.add_argument("--udev-rule", action="store_true", help="print udev rules for their USB ids")
     return ap
 
 
-def main(argv: list[str] | None = None, *, registry=None, wd75=None, basilisk=None) -> int:
+def main(argv: list[str] | None = None, *, registry=None, wd75=None, basilisk=None, extensions=None) -> int:
     args = _parser().parse_args(sys.argv[1:] if argv is None else argv)
     try:
+        if args.cmd == "devices":
+            return cmd_devices(extensions or load_extensions(), args.udev_rule)
         if args.cmd == "status":
             return cmd_status(registry or _registry())
         if args.cmd == "battery":

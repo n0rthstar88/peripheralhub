@@ -5,6 +5,7 @@ Keys used by the app:
   wd75.rgb            {"hue", "sat", "brightness", "effect", "speed"}
   battery.wd75        {"level": int, "at": float}
   battery.low_threshold (default 20)
+  devices.hidden      [device id, ...] left out of the app and never polled
   mouse.dpi (int), mouse.poll (125|500|1000), mouse.brightness (0-255)
   mouse.stages        {"values": [int, ...1-5], "active": int (1-based)}
   mouse.effect        {"kind": "firmware"|"host", "name": str, "params": dict}; colours are [r, g, b] lists

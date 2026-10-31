@@ -11,6 +11,7 @@ from typing import Any
 
 from peripheralhub.basilisk.device import Basilisk
 from peripheralhub.basilisk.effects import make_effect
+from peripheralhub.core.extensions import Peripheral, hidden_ids, load_extensions
 from peripheralhub.core.notify import LowBatteryNotifier
 from peripheralhub.core.registry import BACKUP_DIR, Registry
 from peripheralhub.core.settings import DEFAULT_PATH, Settings
@@ -29,9 +30,10 @@ def _log(what: str) -> None:
 
 class Service:
     def __init__(self, settings: Settings, basilisk: Basilisk, registry: Registry, notifier: LowBatteryNotifier,
-                 clock: Callable[[], float] = time.monotonic) -> None:
+                 clock: Callable[[], float] = time.monotonic, extras: list[Peripheral] | None = None) -> None:
         self._settings, self._mouse, self._registry, self._notifier = settings, basilisk, registry, notifier
         self._clock = clock
+        self._extras = extras or []
         self._mtime = settings.mtime()
         self._effect_key: Any = None
         self._frame_fn: Callable[[float], list] | None = None
@@ -107,6 +109,11 @@ class Service:
                 self._mouse_ready = True
                 self.apply_saved_mouse()
             self._mouse_ready = ready
+            for device in self._extras:
+                try:
+                    device.background()
+                except Exception:
+                    _log(f"{device.id} background work failed")
         if self._next_batteries is None or now + _EPS >= self._next_batteries:
             self._next_batteries = now + BATTERY_POLL_S
             try:
@@ -127,8 +134,12 @@ class Service:
 def main() -> int:
     settings = Settings(DEFAULT_PATH)
     basilisk = Basilisk()
-    registry = Registry(settings, wd75=Wd75Probe(str(Path(BACKUP_DIR).expanduser())), basilisk=basilisk)
-    service = Service(settings, basilisk, registry, LowBatteryNotifier(settings))
+    ext = load_extensions()
+    for error in ext.errors:
+        print(f"peripheralhub-service: {error.path}: {error.message}", file=sys.stderr)
+    registry = Registry(settings, wd75=Wd75Probe(str(Path(BACKUP_DIR).expanduser())), basilisk=basilisk,
+                        extras=ext.devices, hidden=hidden_ids(settings, ext.devices))
+    service = Service(settings, basilisk, registry, LowBatteryNotifier(settings), extras=registry.extras)
     stopping = False
 
     def on_term(_sig, _frame) -> None:

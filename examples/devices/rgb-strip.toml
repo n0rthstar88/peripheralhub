@@ -1,0 +1,12 @@
+# Control lighting through another tool, here OpenRGB.
+# With no [detect] table, the device always shows as available.
+title = "RGB Strip"
+icon = "weather-clear-night-symbolic"
+
+[[actions]]
+label = "Red"
+command = "openrgb --mode static --color FF0000"
+
+[[actions]]
+label = "Off"
+command = "openrgb --mode static --color 000000"

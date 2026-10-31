@@ -1,6 +1,6 @@
 [project]
 name = "peripheralhub"
-version = "0.1.0"
+version = "0.2.0"
 description = "GTK4/libadwaita app for keyboard, mouse, display and battery settings on Omarchy"
 readme = "README.md"
 requires-python = ">=3.11"
