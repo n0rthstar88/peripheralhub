@@ -18,6 +18,7 @@ The screenshots show the app running against real, connected hardware.
 - **Displays:** drag to arrange monitors, and change resolution, refresh rate, scale and rotation. Every change reverts by itself after 15 seconds unless you press Keep.
 - **Batteries:** animated battery levels for the keyboard and the SteelSeries Arctis Nova 7P headset, with a low-battery notification.
 - **Background service and CLI:** a small user service and the `phub` command-line tool.
+- **Fully customizable:** the code is open and split by device and platform, so you can change it to add your own peripherals or run on other platforms. See [Customizing](#customizing).
 
 ## Screenshots
 
@@ -45,7 +46,7 @@ Supported devices:
 | Razer Basilisk V3 | `1532:0099` | USB |
 | SteelSeries Arctis Nova 7P | via `headsetcontrol` | 2.4G dongle |
 
-Other keyboards and mice are not supported. The keyboard code is written for the WD75's layout and firmware, so don't point it at a different board.
+Other keyboards and mice don't work out of the box, but you can add them: see [Customizing](#customizing). The keyboard code is written for the WD75's layout and firmware, so don't point it at a different board without adapting it first.
 
 ## Install
 
@@ -115,6 +116,39 @@ If you need to undo something:
 - The headset needs its dongle plugged straight into the PC. Docks may not pass it through to `headsetcontrol`.
 - If `~/.config/hypr/omasettings.lua` sets monitor options, they load after `monitors.lua` and win. The Displays page warns about this.
 - The Basilisk's LED zone mapping is provisional and hasn't been fully mapped on hardware.
+
+## Customizing
+
+PeripheralHub is completely customizable if you're willing to edit Python: you can add peripherals, remove the ones you don't own, or adapt it to another platform. Customizing means changing the code, as there's no plugin system or device config file yet. Only the setup listed under [Compatibility](#compatibility) has been tested, so test your changes carefully on your own hardware.
+
+### Add a peripheral
+
+1. **Write the device code.** Create `src/peripheralhub/<device>/` with its protocol and device class. `basilisk/` is the closest example for a HID device, and `headset/` shows how little is needed to wrap a command-line tool.
+2. **Report its status.** In `core/registry.py`, create the device, poll it, and add a `DeviceStatus` for it in `_build()`.
+3. **Add its page.** Write a class with `widget()` and `on_status()` (examples are in `ui/pages/`), then add the device to `SIDEBAR` and `PAGES` in `ui/window.py`. If it has a battery, add it to `_HAS_BATTERY` too.
+4. **Allow access.** Add its USB vendor and product IDs to `data/70-peripheralhub.rules` and re-run `./install.sh`.
+5. **Optional: run it in the background.** Add anything that should run without the window open to `service.py`.
+
+For another keyboard running QMK and VIA, start from `wd75/`. `via.py`, `macros.py` and `keycodes.py` hold the VIA client, macro format and keycodes, while `device.py` and `data/` hold what's specific to the WD75, including its IDs, layout and factory snapshot. Use your own keyboard's definition and take your own factory snapshot, and keep the VIA command allowlist in place.
+
+### Adapt it to another platform
+
+These are the parts tied to a specific platform:
+
+| Part | Depends on | Where |
+|---|---|---|
+| Monitor control | Hyprland (`hyprctl`, `monitors.lua`) | `displays/`, `ui/pages/displays.py` |
+| Keyboard and mouse access | Linux hidraw and sysfs, udev rule | `core/hidraw.py`, `data/70-peripheralhub.rules` |
+| Macro recorder key codes | Linux input event codes | `ui/keymap_hid.py` |
+| Keyboard battery | UPower | `core/battery.py` |
+| Headset battery | `headsetcontrol` | `headset/device.py` |
+| Notifications | `notify-send` | `core/notify.py` |
+| Background service | systemd user service | `core/systemd.py`, `data/peripheralhub.service` |
+| Install | Paths and tools in `install.sh` | `install.sh` |
+
+Another Linux desktop mostly needs a new display backend. Another operating system also needs replacements for device access, the installer, and the other Linux-specific parts above.
+
+Please read the safety rules in [CONTRIBUTING.md](CONTRIBUTING.md#hardware-safety) before writing to any new hardware. If you get something working, a pull request is welcome.
 
 ## Project status
 
