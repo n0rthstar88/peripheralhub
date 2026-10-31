@@ -79,6 +79,8 @@ def register(api):
     api.add_device(MyPad())
 ```
 
+To see a complete working plugin, try [`examples/plugins/test_plugin.py`](../examples/plugins/test_plugin.py). The README explains [how to run it](../README.md#customizing).
+
 `actions` works like it does in device files, using `Action(label, command)` from `peripheralhub.plugin`, which also provides `run_command` and `usb_present`. Both the app and the service load your plugin, so two copies can run at once. If they share a device, your plugin has to handle that itself.
 
 **Direct device access:** if your plugin opens a hidraw device, your user needs permission. `phub devices --udev-rule` prints a rule for the USB ids your custom devices declare. Save it to its own file so `install.sh` won't overwrite it:

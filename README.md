@@ -147,6 +147,22 @@ It gets a sidebar entry, connection status, a battery level with low-battery ale
 
 **Go further with a Python plugin.** Drop a `.py` file into `~/.config/peripheralhub/plugins/` to add your own page, background work, or direct device access.
 
+**Try it with the test plugin.** This harmless plugin uses every plugin feature and never touches your hardware. Its battery level is simulated and stays above the low-battery alert. From your clone, run:
+
+```sh
+mkdir -p ~/.config/peripheralhub/plugins
+cp examples/plugins/test_plugin.py ~/.config/peripheralhub/plugins/
+systemctl --user restart peripheralhub
+phub devices
+```
+
+`phub devices` should list `test-plugin`. Reopen the app and click **Test Plugin** in the sidebar: "Background service last ran this plugin" should stay within about 2 seconds, and **Run a test command** should show the current time. To remove it:
+
+```sh
+rm ~/.config/peripheralhub/plugins/test_plugin.py ~/.cache/peripheralhub-test-plugin-heartbeat
+systemctl --user restart peripheralhub
+```
+
 **Hide what you don't own.** Turn devices off under Settings → Devices. The app and service then leave them alone.
 
 **Use another platform:**
