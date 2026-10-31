@@ -118,7 +118,7 @@ If you need to undo something:
 
 ## Project status
 
-Version 0.1.0, early and built for one specific desk setup. The automated test suite passes, the device pages have been run against real hardware, and the Displays flow (rotate, revert, countdown expiry, Keep) has been checked on real monitors. The full hands-on walkthrough isn't finished: the keymap and macro edit dialogs and the service-driven mouse animations still need checking on hardware, so expect rough edges there.
+Version 0.1.0, early and built for one specific desk setup. The automated test suite passes, the app is in regular use on the hardware listed above, and the Displays flow (rotate, revert, countdown expiry, Keep) has been checked on real monitors. It hasn't been tried on any other setup, so expect rough edges there.
 
 ## Development
 
@@ -132,7 +132,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for how to contribute and [SECURITY.md](S
 
 ## Credits
 
-PeripheralHub for Omarchy is a Linux port and extension of the original Windows PeripheralHub by [Chad Fiaschetti](https://github.com/chad-fiaschetti), used with their permission. It would not exist without that work. The Razer protocol work follows [OpenRazer](https://github.com/openrazer/openrazer). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+PeripheralHub for Omarchy takes its name and idea from the Windows PeripheralHub by [Chad Fiaschetti](https://github.com/chad-fiaschetti), with their permission. The two work completely differently: this is a separate app, written in Python and GTK for Omarchy and different hardware. The Razer protocol work follows [OpenRazer](https://github.com/openrazer/openrazer). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## License
 

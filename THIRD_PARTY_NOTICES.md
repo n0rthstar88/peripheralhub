@@ -17,12 +17,12 @@ If you are the rights holder and want it removed, please open an issue.
 - **Files:** `src/peripheralhub/wd75/data/factory-snapshot.json`, `tests/data/factory-snapshot.json`
 - **Source:** a read-out of the factory keymap and lighting values from a WD75 V2, used to restore defaults. Its keymap reflects the keyboard's firmware defaults, which may belong to Womier.
 
-## Works this project is based on
+## Related works and references
 
 ### PeripheralHub for Windows
 
 - **Author:** Chad Fiaschetti ([@chad-fiaschetti](https://github.com/chad-fiaschetti))
-- **Use:** this project is a Linux port and extension of the original C#/WPF app. Its concept and feature design, and parts of its VIA logic such as the macro buffer format, come from that app. Used with the author's permission. None of its source files are included here.
+- **Use:** this project takes its name and idea from that C#/WPF app, with the author's permission. It is a separate implementation that works completely differently, and none of the original app's source files are included here.
 
 ### OpenRazer
 
