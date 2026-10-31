@@ -1,7 +1,22 @@
 [project]
 name = "peripheralhub"
 version = "0.1.0"
+description = "GTK4/libadwaita app for keyboard, mouse, display and battery settings on Omarchy"
+readme = "README.md"
 requires-python = ">=3.11"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+keywords = ["omarchy", "hyprland", "gtk4", "libadwaita", "via", "qmk", "razer"]
+classifiers = [
+    "Environment :: X11 Applications :: GTK",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Hardware",
+]
+
+[project.urls]
+Homepage = "https://github.com/n0rthstar88/peripheralhub"
+Issues = "https://github.com/n0rthstar88/peripheralhub/issues"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
